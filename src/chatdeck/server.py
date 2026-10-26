@@ -87,6 +87,14 @@ def project(cwd):
         _projects[cwd] = root
     return _projects[cwd].replace(HOME, "~", 1)
 
+def chat_project(e, start_cwd=None):
+    """The project a chat belongs to: the one it did most of its work in. A chat started in your home
+    folder that then worked in ~/code/app belongs to app, not to the home folder."""
+    totals = {}
+    for cwd, n in (e.cwds if e else {}).items():
+        p = project(cwd); totals[p] = totals.get(p, 0) + n
+    return max(totals, key=totals.get) if totals else project(start_cwd or (e.cwd if e else ""))
+
 # Names given to chats while they were running. Claude Code keeps a running chat's name in memory
 # and rewrites it, so the new name is shown from here and written into the chat once it ends.
 PENDING = os.path.join(DATA, "pending-names.json")
@@ -122,7 +130,7 @@ def state():
     for sid, (p, e) in chats.items():
         a = act.get(sid, {})
         out.append({"sid": sid, "name": pend.get(sid) or a.get("name") or e.title or "(empty)",
-                    "cwd": (a.get("cwd") or e.cwd or "").replace(HOME, "~"), "project": project(a.get("cwd") or e.cwd),
+                    "cwd": (a.get("cwd") or e.cwd or "").replace(HOME, "~"), "project": chat_project(e, a.get("cwd")),
                     "ctx": e.ctx, "msgs": e.msgs, "mtime": e.mtime, "size": e.size, "cost": round(e.cost, 2),
                     "status": a.get("status"), "kind": a.get("kind"), "started": a.get("startedAt"), "waiting": wait.get(sid)})
     for sid, a in act.items():  # running but no transcript yet
@@ -132,7 +140,7 @@ def state():
                         "ctx": 0, "msgs": 0, "mtime": time.time(), "size": 0, "cost": 0, "status": a.get("status"),
                         "kind": a.get("kind"), "started": a.get("startedAt"), "waiting": wait.get(sid)})
     out.sort(key=lambda x: -x["mtime"])
-    return {"chats": out, "now": time.time(), "usage": usage.summary([e for _, e in chats.values()], STATUS, LIMITS, project=project)}
+    return {"chats": out, "now": time.time(), "usage": usage.summary([e for _, e in chats.values()], STATUS, LIMITS, project=chat_project)}
 
 def manual(cwd, command):
     """What to paste into a terminal when no terminal could be opened for the person."""

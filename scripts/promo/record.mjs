@@ -86,7 +86,7 @@ const FPS = 30, FRAME = 1000 / FPS;
 const CAPTION_SPACE = 120;   // stage px at the bottom kept for the caption when framing a zoom
 
 const LOGO = "data:image/svg+xml;base64," + fs.readFileSync(path.join(ROOT, "src/chatdeck/static/logo.svg")).toString("base64");
-const INSTALL = "pipx install git+https://github.com/Abdifatah09/chatdeck";
+const INSTALL = "pipx install chatdeck";
 
 const STAGE_HTML = `<!doctype html><html><head><meta charset="utf-8"><style>
   *{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden}

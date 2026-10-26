@@ -26,8 +26,7 @@ Python 3.9+ standard library only, no dependencies.
 ## Install
 
 ```sh
-pipx install chatdeck          # once it's on PyPI; until then:
-pipx install git+https://github.com/Abdifatah09/chatdeck
+pipx install chatdeck          # or: pip install chatdeck
 ```
 
 No pip? Clone the repo and run `./install.sh`. It puts a `chatdeck` command in `~/.local/bin`

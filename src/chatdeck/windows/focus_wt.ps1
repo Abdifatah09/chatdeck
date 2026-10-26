@@ -1,4 +1,5 @@
-# Brings the Windows Terminal tab titled $env:DASH_MARK to the front, on any virtual desktop.
+# Brings the Windows Terminal tab titled $env:DASH_MARK to the front, on any virtual desktop, and
+# optionally types $env:DASH_TYPE into it.
 # Used by terminals.py; set $env:DASH_VDLIB to VirtualDesktopLib.cs to switch desktops reliably.
 $m = $env:DASH_MARK; $lib = $env:DASH_VDLIB
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
@@ -40,17 +41,28 @@ $tabCond = New-Object System.Windows.Automation.PropertyCondition($A::ControlTyp
 function Tab($h) {   # the tab carrying the mark, if this window's tabs are readable (not on another desktop)
   foreach ($t in $A::FromHandle($h).FindAll([System.Windows.Automation.TreeScope]::Descendants, $tabCond)) { if ($t.Current.Name -eq $m) { return $t } }
 }
+function Done($h) {
+  # With $env:DASH_TYPE set, type that text into the chat and press Enter - but only once the chat's
+  # terminal really is the window in front, so keystrokes never land anywhere else.
+  if ($env:DASH_TYPE) {
+    Start-Sleep -Milliseconds 400
+    if ([F]::GetForegroundWindow() -ne $h) { "notfront"; exit }
+    Add-Type -AssemblyName System.Windows.Forms
+    [System.Windows.Forms.SendKeys]::SendWait($env:DASH_TYPE + "{ENTER}")
+  }
+  "ok"; exit
+}
 for ($i = 0; $i -lt 6; $i++) {   # the terminal takes a moment to pick up the new title
   $wins = [F]::Terminals()
-  foreach ($h in $wins) { if ([F]::Title($h) -eq $m) { Show $h; "ok"; exit } }
+  foreach ($h in $wins) { if ([F]::Title($h) -eq $m) { Show $h; Done $h } }
   foreach ($h in $wins) { if (-not [F]::Cloaked($h)) { $t = Tab $h; if ($t) {
-    $t.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select(); Show $h; "ok"; exit } } }
+    $t.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select(); Show $h; Done $h } } }
   Start-Sleep -Milliseconds 250
 }
 # Last resort: a background tab in a window on another desktop. Those tabs can only be read once
 # the window is on screen, so visit each such window, then go back if the chat isn't there.
 $back = [F]::GetForegroundWindow()
 foreach ($h in $wins) { if ([F]::Cloaked($h)) { Show $h; Start-Sleep -Milliseconds 300; $t = Tab $h; if ($t) {
-  $t.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select(); "ok"; exit } } }
+  $t.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select(); Done $h } } }
 if ($back -ne [IntPtr]::Zero) { Show $back }
 "missing"

@@ -221,5 +221,39 @@ class CliTest(unittest.TestCase):
         self.assertEqual((a.no_open, a.port), (True, 1))
 
 
+class RenameRunningTest(Tmp):
+    def test_name_shows_now_and_is_saved_when_the_chat_ends(self):
+        from chatdeck import server
+        self.write(user("fix the login bug"))
+        idx, running = transcripts.Index(self.dir), {SID: {"name": "auto-name", "status": "idle"}}
+        with unittest.mock.patch.object(server, "INDEX", idx), unittest.mock.patch.object(server, "PROJECTS", self.dir), \
+             unittest.mock.patch.object(server, "agents", lambda fresh=False: running):
+            with unittest.mock.patch.object(server.terminals, "type_into", lambda *a: False):   # terminal not reachable
+                r = server.rename(SID, "Login bug")
+            self.assertTrue(r["pending"])
+            self.assertEqual(idx.get(self.path).title, "fix the login bug")          # transcript untouched while running
+            self.assertEqual(next(c for c in server.state()["chats"] if c["sid"] == SID)["name"], "Login bug")
+            running.clear()                                                           # the chat ends
+            self.assertEqual(next(c for c in server.state()["chats"] if c["sid"] == SID)["name"], "Login bug")
+            self.assertEqual(idx.get(self.path).title, "Login bug")
+            self.assertEqual(server.pending_names(), {})
+
+
+    def test_idle_chat_gets_rename_typed_and_rename_in_claude_wins(self):
+        from chatdeck import server
+        self.write(user("x"))
+        idx, running, typed = transcripts.Index(self.dir), {SID: {"name": "auto", "status": "idle", "kind": "interactive", "pid": 1}}, []
+        with unittest.mock.patch.object(server, "INDEX", idx), unittest.mock.patch.object(server, "PROJECTS", self.dir), \
+             unittest.mock.patch.object(server, "agents", lambda fresh=False: running), \
+             unittest.mock.patch.object(server.terminals, "type_into", lambda pid, name, text: typed.append(text) or True):
+            self.assertTrue(server.rename(SID, "Login bug")["typed"])
+            self.assertEqual(typed, ["/rename Login bug"]); self.assertEqual(server.pending_names(), {})
+            running[SID]["status"] = "busy"
+            self.assertTrue(server.rename(SID, "Later name")["busy"])        # busy: nothing typed, kept for later
+            self.assertEqual(len(typed), 1)
+            running[SID]["name"] = "renamed-in-claude"; server.state()       # /rename in Claude Code meanwhile
+            self.assertEqual(server.pending_names(), {})
+
+
 if __name__ == "__main__":
     unittest.main()

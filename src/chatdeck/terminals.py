@@ -85,7 +85,7 @@ def _wsl_launch(cwd, command):
     return _spawn([wt, "-w", "0", "new-tab", "wsl.exe", "-d", distro, "--cd", cwd, "--", "bash", "-lic", command], cwd="/mnt/c")
 
 
-def _wsl_focus(pid, name):
+def _wsl_focus(pid, name, typed=None):
     ps = _win_exe("powershell.exe", "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe")
     if not ps: return False
     with open(os.path.join(WINDOWS, "focus_wt.ps1")) as f: script = f.read()
@@ -93,7 +93,8 @@ def _wsl_focus(pid, name):
         # Optional: VirtualDesktopLib.cs (github.com/MScholtes/VirtualDesktop) lets it switch to a
         # window on another virtual desktop reliably. Give its Windows path as "vdlib" in the config.
         env = dict(os.environ, DASH_MARK=mark, DASH_VDLIB=config.get("vdlib", ""),
-                   WSLENV="DASH_MARK:DASH_VDLIB")
+                   DASH_TYPE="".join("{" + c + "}" if c in "+^%~(){}[]" else c for c in typed or ""),   # SendKeys escaping
+                   WSLENV="DASH_MARK:DASH_VDLIB:DASH_TYPE")
         try:
             r = subprocess.run([ps, "-NoProfile", "-Command", script], capture_output=True, text=True,
                                cwd="/mnt/c", env=env, timeout=30)
@@ -174,6 +175,26 @@ def _linux_focus(pid, name):
                     subprocess.run(["sleep", "0.25"])
         return False
     return _tagged(pid, name, find)
+
+
+def type_into(pid, name, text):
+    """Bring a running chat's terminal to the front and type text into it, then Enter.
+    Callers must make sure the chat is idle at its prompt."""
+    k = kind()
+    try:
+        if k == "wsl": return _wsl_focus(pid, name, text)
+        if k == "mac" and _mac_focus(pid, name):
+            subprocess.run(["sleep", "0.4"])
+            ok, _ = _osa("on run argv", 'tell application "System Events"', "keystroke (item 1 of argv)", "key code 36",
+                         "end tell", "end run", args=[text])   # needs Accessibility permission for the terminal
+            return ok
+        if k == "linux" and shutil.which("xdotool") and _linux_focus(pid, name):
+            subprocess.run(["sleep", "0.4"])
+            return subprocess.run(["xdotool", "type", "--delay", "8", "--", text], stdout=DEVNULL, stderr=DEVNULL).returncode == 0 \
+                and subprocess.run(["xdotool", "key", "Return"], stdout=DEVNULL, stderr=DEVNULL).returncode == 0
+    except OSError:
+        pass
+    return False
 
 
 def launch(cwd, command):

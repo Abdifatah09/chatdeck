@@ -231,7 +231,9 @@ async function refresh(force){if(inflight&&!force)return;inflight=true;try{const
   const stale=Date.now()-lastDraw>60000;  // refresh the "x min ago" labels once a minute
   if(force||sig!==lastSig||stale){lastSig=sig;
     if(!force&&(editing||(pressing||hovering)&&(!held||Date.now()-heldSince<8000))){if(!held)heldSince=Date.now();held=d}else{held=null;draw(d)}}
- }catch(e){$("off").style.display="block"}finally{inflight=false}}
+ }catch(e){$("off").style.display="block";
+   if(e.message==="404"||e.message==="403")setTimeout(()=>location.reload(),1500)  // server restarted with a new token
+ }finally{inflight=false}}
 let searchT,searchN=0;
 function onSearch(){render();clearTimeout(searchT);const q=$("q").value.trim();if(q.length<2){hits={};render();return}
   searchT=setTimeout(async()=>{const n=++searchN;try{const h=await getJ("/api/search?q="+encodeURIComponent(q));if(n===searchN){hits=h;render()}}catch{}},220)}
@@ -261,16 +263,18 @@ async function openViewer(sid){let d;try{d=await getJ("/api/chat?sid="+sid)}catc
   $("vBody").innerHTML=h||'<div class="empty">This chat has no messages.</div>';
   const m=$("vBody").querySelector("mark");if(m)m.scrollIntoView({block:"center"});else $("vBody").scrollTop=$("vBody").scrollHeight}
 function closeViewer(){$("viewer").classList.remove("on");V=null}
-/* rename in place: the name turns into a text box; Enter saves, Esc cancels. Running chats keep the name
-   Claude Code gives them, so for those it points to /rename instead. */
+/* rename in place: the name turns into a text box; Enter saves, Esc cancels. A running chat shows its new
+   name here straight away and gets it for good when it ends (Claude Code keeps its own name until then). */
 let editing=false;
 function editName(sid,el){const x=S.find(y=>y.sid===sid)||(V&&V.sid===sid?{name:V.name,status:V.running}:null);if(!x||!el)return;
-  if(x.status)return toast("This chat is running – type /rename <new name> in it to rename it",4000);
   const i=document.createElement("input");i.className="ren";i.value=x.name==="(empty)"?"":x.name;i.placeholder="Name this chat";i.maxLength=80;
   el.replaceWith(i);i.focus();i.select();editing=true;
   let done=false;const finish=async save=>{if(done)return;done=true;editing=false;const title=i.value.trim();i.replaceWith(el);
     if(save&&title&&title!==x.name){const r=await getJ("/api/rename",{sid,title});
-      if(r.ok){el.textContent=r.title;if(V&&V.sid===sid)V.name=r.title;toast("Renamed")}else toast("Couldn't rename: "+r.error)}
+      if(r.ok){el.textContent=r.title;if(V&&V.sid===sid)V.name=r.title;
+        toast(r.typed?"Renamed – ran /rename in the chat for you":r.pending?(r.busy?"Renamed here – the chat is busy, so Claude Code gets the name when it ends":
+          "Renamed here – couldn't reach its terminal, so Claude Code gets the name when it ends"):"Renamed",r.pending?5000:2500)}
+      else toast("Couldn't rename: "+r.error)}
     refresh(true)};
   i.addEventListener("keydown",e=>{e.stopPropagation();if(e.key==="Enter")finish(true);if(e.key==="Escape")finish(false)});i.addEventListener("blur",()=>finish(true))}
 function startRename(){if(V)editName(V.sid,$("vTitle"))}

@@ -83,17 +83,47 @@ def project(cwd):
         _projects[cwd] = root
     return _projects[cwd].replace(HOME, "~", 1)
 
+# Names given to chats while they were running. Claude Code keeps a running chat's name in memory
+# and rewrites it, so the new name is shown from here and written into the chat once it ends.
+PENDING = os.path.join(DATA, "pending-names.json")
+_pending_lock = threading.Lock()
+
+def pending_names():
+    try:
+        with open(PENDING) as f: return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+def _save_pending(names):
+    os.makedirs(DATA, exist_ok=True)
+    with open(PENDING + ".tmp", "w") as f: json.dump(names, f)
+    os.replace(PENDING + ".tmp", PENDING)
+
+def apply_pending(act, paths):
+    """Write pending names into chats that have stopped ({sid: transcript path}); returns {sid: name} still pending.
+    A name is dropped instead if the chat was renamed in Claude Code meanwhile (/rename there wins)."""
+    with _pending_lock:
+        names = pending_names(); changed = False
+        for sid, p in list(names.items()):
+            renamed_there = sid in act and act[sid].get("name") not in (p["was"], p["title"])
+            if sid in act and not renamed_there: continue
+            if not renamed_there and sid in paths: transcripts.rename(paths[sid], sid, p["title"])
+            del names[sid]; changed = True
+        if changed: _save_pending(names)
+        return {sid: p["title"] for sid, p in names.items()}
+
 def state():
-    act = agents(); chats = INDEX.all(); wait = waiting(act, chats); out = []
+    act = agents(); pend = apply_pending(act, INDEX.files())   # before reading chats, so a name just written shows
+    chats = INDEX.all(); wait = waiting(act, chats); out = []
     for sid, (p, e) in chats.items():
         a = act.get(sid, {})
-        out.append({"sid": sid, "name": a.get("name") or e.title or "(empty)",
+        out.append({"sid": sid, "name": pend.get(sid) or a.get("name") or e.title or "(empty)",
                     "cwd": (a.get("cwd") or e.cwd or "").replace(HOME, "~"), "project": project(a.get("cwd") or e.cwd),
                     "ctx": e.ctx, "msgs": e.msgs, "mtime": e.mtime, "size": e.size, "cost": round(e.cost, 2),
                     "status": a.get("status"), "kind": a.get("kind"), "started": a.get("startedAt"), "waiting": wait.get(sid)})
     for sid, a in act.items():  # running but no transcript yet
         if sid not in chats:
-            out.append({"sid": sid, "name": a.get("name") or "(new chat)", "cwd": (a.get("cwd") or "").replace(HOME, "~"),
+            out.append({"sid": sid, "name": pend.get(sid) or a.get("name") or "(new chat)", "cwd": (a.get("cwd") or "").replace(HOME, "~"),
                         "project": project(a.get("cwd")),
                         "ctx": 0, "msgs": 0, "mtime": time.time(), "size": 0, "cost": 0, "status": a.get("status"),
                         "kind": a.get("kind"), "started": a.get("startedAt"), "waiting": wait.get(sid)})
@@ -139,8 +169,16 @@ def rename(sid, title):
     title = " ".join(str(title or "").split())[:80]
     p = transcript(sid)
     if not p or not title: return {"ok": False, "error": "no such chat"}
-    if sid in agents(fresh=True):
-        return {"ok": False, "error": "it's running - type /rename in the chat instead"}
+    act = agents(fresh=True)
+    if sid in act:
+        a = act[sid]
+        # Idle at its prompt in a terminal: run Claude Code's own /rename in it, so the name changes everywhere.
+        idle = a.get("status") == "idle" and a.get("kind") == "interactive" and sid not in waiting(act, INDEX.all())
+        if idle and a.get("pid") and terminals.type_into(int(a["pid"]), a.get("name"), f"/rename {title}"):
+            return {"ok": True, "title": title, "typed": True}
+        with _pending_lock:   # busy, waiting on you, or not in a terminal we can reach: see PENDING
+            names = pending_names(); names[sid] = {"title": title, "was": a.get("name")}; _save_pending(names)
+        return {"ok": True, "title": title, "pending": True, "busy": not idle}
     transcripts.rename(p, sid, title)
     return {"ok": True, "title": title}
 
@@ -169,7 +207,7 @@ def chat(sid):
     p = transcript(sid)
     if not p: return None
     e = INDEX.get(p); a = agents().get(sid, {})
-    return dict(transcripts.messages(p), sid=sid, name=a.get("name") or e.title or "(empty)", running=bool(a),
+    return dict(transcripts.messages(p), sid=sid, name=(pending_names().get(sid) or {}).get("title") or a.get("name") or e.title or "(empty)", running=bool(a),
                 cwd=(e.cwd or "").replace(HOME, "~"), cost=round(e.cost, 2), size=e.size, mtime=e.mtime)
 
 class H(BaseHTTPRequestHandler):

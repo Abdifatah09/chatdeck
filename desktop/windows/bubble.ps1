@@ -1,13 +1,20 @@
 <#
   Claude Chats bubble: a small always-on-top button in the bottom-left corner of the screen.
   Click it to pop the dashboard up above it; click it again, or anywhere else, to tuck it away.
-  Drag it to move it. Right-click for more. The badge counts running chats and turns amber,
-  with a pulsing ring, when a chat is waiting for you.
+  Drag it to move it. Right-click to hide it or for more. Starting it again while it is hidden
+  brings it back. The badge counts running chats and turns amber, with a pulsing ring, when a
+  chat is waiting for you.
 
   Needs the dashboard server running, and Chrome or Edge for the pop-up.
   powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File bubble.ps1 [-Port 47123]
 #>
 param([int]$Port = 47123, [int]$PopupWidth = 460, [int]$PopupHeight = 760)
+
+# One bubble at a time: starting it again just asks the running one to show itself.
+$created = $false
+$script:mutex = New-Object System.Threading.Mutex($true, "Local\ClaudeChatsBubble", [ref]$created)
+$script:showSignal = New-Object System.Threading.EventWaitHandle($false, [System.Threading.EventResetMode]::AutoReset, "Local\ClaudeChatsBubbleShow")
+if (-not $created) { $script:showSignal.Set() | Out-Null; exit }
 
 Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase
 Add-Type @'
@@ -37,6 +44,7 @@ $StateFile = Join-Path $env:APPDATA "claude-dash\bubble.json"
 $script:token = $null
 $script:shown = $false
 $script:shownAt = [DateTime]::MinValue
+$script:hiddenUntil = $null   # set while the bubble itself is hidden
 
 # --- talking to the server -------------------------------------------------------------------
 function Get-Summary {
@@ -141,6 +149,9 @@ function Hide-Popup {
 
 function Toggle-Popup { if ($script:shown) { Hide-Popup } else { Show-Popup } }
 
+function Hide-Bubble($until) { Hide-Popup; $win.Hide(); $script:hiddenUntil = $until }
+function Show-Bubble { $script:hiddenUntil = $null; $win.Show(); [U]::ShowWindow($script:self, 4) | Out-Null }
+
 # Click toggles; dragging moves the bubble (and the pop-up with it).
 $win.Add_MouseLeftButtonDown({
   $l = $win.Left; $t = $win.Top
@@ -155,6 +166,8 @@ Add-Item "Show chats" { Show-Popup }
 Add-Item "Open the full dashboard" { $b = Browser; if ($b) { Start-Process $b -ArgumentList "--app=$Base/" } }
 Add-Item "Move back to the corner" { Home-Position; Save-Position }
 $menu.Items.Add((New-Object System.Windows.Controls.Separator)) | Out-Null
+Add-Item "Hide for an hour" { Hide-Bubble ((Get-Date).AddHours(1)) }
+Add-Item "Hide (start it again to bring it back)" { Hide-Bubble ([DateTime]::MaxValue) }
 Add-Item "Quit" { $win.Close() }
 $win.ContextMenu = $menu
 
@@ -168,6 +181,7 @@ $script:self = [IntPtr]::Zero
 $focusTimer = New-Object System.Windows.Threading.DispatcherTimer
 $focusTimer.Interval = [TimeSpan]::FromMilliseconds(300)
 $focusTimer.Add_Tick({
+  if ($script:showSignal.WaitOne(0) -or ($script:hiddenUntil -and (Get-Date) -ge $script:hiddenUntil)) { Show-Bubble }
   if (-not $script:shown) { return }
   $h = Popup-Handle
   if ($h -eq [IntPtr]::Zero -or -not [U]::IsWindowVisible($h) -or [U]::IsIconic($h)) { $script:shown = $false; return }

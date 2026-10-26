@@ -2,13 +2,13 @@
 """Claude chats dashboard: local-only server for the AOC sidebar.
 Lists running sessions (claude agents --json) and saved transcripts under
 ~/.claude/projects, and can view, search, rename, export and delete saved chats, stop
-sessions, and open a chat in Windows Terminal. Binds 127.0.0.1 only; every API call needs
+sessions, and open chats in a terminal (see terminals.py). Binds 127.0.0.1 only; every API call needs
 the per-run token embedded in the page (custom header => cross-site pages can't call it)."""
-import json, os, glob, secrets, signal, subprocess, threading, time
+import json, os, glob, secrets, shlex, signal, subprocess, threading, time
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs, quote
 
-import transcripts, usage
+import terminals, transcripts, usage
 from transcripts import UUID
 
 HOME = os.path.expanduser("~")
@@ -60,117 +60,55 @@ def waiting(act, chats):
             pass
     return out
 
+_projects = {}
+def project(cwd):
+    """The project a folder belongs to: the main checkout of its git repo (so subfolders and
+    worktrees count as the repo itself), or the folder when it isn't in a repo."""
+    if not cwd: return ""
+    if cwd not in _projects:
+        root = cwd.split(os.sep + ".claude" + os.sep + "worktrees" + os.sep)[0]   # Claude's worktrees, even once removed
+        try:
+            r = subprocess.run(["git", "-C", cwd, "rev-parse", "--path-format=absolute", "--git-common-dir"],
+                               capture_output=True, text=True, timeout=5)
+            common = r.stdout.strip()
+            if r.returncode == 0 and os.path.basename(common) == ".git": root = os.path.dirname(common)
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+        _projects[cwd] = root
+    return _projects[cwd].replace(HOME, "~", 1)
+
 def state():
     act = agents(); chats = INDEX.all(); wait = waiting(act, chats); out = []
     for sid, (p, e) in chats.items():
         a = act.get(sid, {})
         out.append({"sid": sid, "name": a.get("name") or e.title or "(empty)",
-                    "cwd": (a.get("cwd") or e.cwd or "").replace(HOME, "~"),
+                    "cwd": (a.get("cwd") or e.cwd or "").replace(HOME, "~"), "project": project(a.get("cwd") or e.cwd),
                     "ctx": e.ctx, "msgs": e.msgs, "mtime": e.mtime, "size": e.size, "cost": round(e.cost, 2),
                     "status": a.get("status"), "kind": a.get("kind"), "waiting": wait.get(sid)})
     for sid, a in act.items():  # running but no transcript yet
         if sid not in chats:
             out.append({"sid": sid, "name": a.get("name") or "(new chat)", "cwd": (a.get("cwd") or "").replace(HOME, "~"),
+                        "project": project(a.get("cwd")),
                         "ctx": 0, "msgs": 0, "mtime": time.time(), "size": 0, "cost": 0, "status": a.get("status"),
                         "kind": a.get("kind"), "waiting": wait.get(sid)})
     out.sort(key=lambda x: -x["mtime"])
     return {"chats": out, "now": time.time(), "usage": usage.summary([e for _, e in chats.values()], STATUS, LIMITS)}
 
-VDLIB = os.environ.get("CLAUDE_DASH_VDLIB") or "C:\\Users\\user\\Scripts\\aoc-pin\\VirtualDesktopLib.cs"
-FOCUS_PS = r"""
-$m = $env:DASH_MARK; $lib = $env:DASH_VDLIB
-Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
-Add-Type @'
-using System; using System.Text; using System.Runtime.InteropServices; using System.Collections.Generic;
-public static class F {
-  delegate bool P(IntPtr h, IntPtr l);
-  [DllImport("user32.dll")] static extern bool EnumWindows(P cb, IntPtr l);
-  [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
-  [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern int GetClassName(IntPtr h, StringBuilder s, int n);
-  [DllImport("user32.dll")] static extern bool IsIconic(IntPtr h);
-  [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr h, int c);
-  [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
-  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
-  [DllImport("user32.dll")] static extern void keybd_event(byte k, byte s, uint f, UIntPtr e);
-  [DllImport("dwmapi.dll")] static extern int DwmGetWindowAttribute(IntPtr h, int a, out int v, int s);
-  public static List<IntPtr> Terminals() { var r = new List<IntPtr>();
-    EnumWindows((h, l) => { var c = new StringBuilder(64); GetClassName(h, c, 64);
-      if (c.ToString() == "CASCADIA_HOSTING_WINDOW_CLASS") r.Add(h); return true; }, IntPtr.Zero); return r; }
-  public static string Title(IntPtr h) { var t = new StringBuilder(512); GetWindowText(h, t, 512); return t.ToString(); }
-  public static bool Cloaked(IntPtr h) { int v; DwmGetWindowAttribute(h, 14, out v, 4); return v != 0; }   // on another virtual desktop
-  public static bool Raise(IntPtr h) {
-    if (IsIconic(h)) ShowWindow(h, 9);
-    keybd_event(0x12, 0, 0, UIntPtr.Zero); keybd_event(0x12, 0, 2, UIntPtr.Zero);   // Alt tap lets us take focus
-    return SetForegroundWindow(h);
-  }
-}
-'@
-$vd = $false
-function Show($h) {
-  if ([F]::Cloaked($h) -and $lib -and (Test-Path $lib)) {
-    if (-not $script:vd) { Add-Type -Path $lib; $script:vd = $true }
-    [VirtualDesktop.Desktop]::FromWindow($h).MakeVisible(); Start-Sleep -Milliseconds 250
-  }
-  [F]::Raise($h) | Out-Null
-}
-$A = [System.Windows.Automation.AutomationElement]
-$tabCond = New-Object System.Windows.Automation.PropertyCondition($A::ControlTypeProperty, [System.Windows.Automation.ControlType]::TabItem)
-function Tab($h) {   # the tab carrying the mark, if this window's tabs are readable (not on another desktop)
-  foreach ($t in $A::FromHandle($h).FindAll([System.Windows.Automation.TreeScope]::Descendants, $tabCond)) { if ($t.Current.Name -eq $m) { return $t } }
-}
-for ($i = 0; $i -lt 6; $i++) {   # the terminal takes a moment to pick up the new title
-  $wins = [F]::Terminals()
-  foreach ($h in $wins) { if ([F]::Title($h) -eq $m) { Show $h; "ok"; exit } }
-  foreach ($h in $wins) { if (-not [F]::Cloaked($h)) { $t = Tab $h; if ($t) {
-    $t.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select(); Show $h; "ok"; exit } } }
-  Start-Sleep -Milliseconds 250
-}
-# Last resort: a background tab in a window on another desktop. Those tabs can only be read once
-# the window is on screen, so visit each such window, then go back if the chat isn't there.
-$back = [F]::GetForegroundWindow()
-foreach ($h in $wins) { if ([F]::Cloaked($h)) { Show $h; Start-Sleep -Milliseconds 300; $t = Tab $h; if ($t) {
-  $t.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select(); "ok"; exit } } }
-if ($back -ne [IntPtr]::Zero) { Show $back }
-"missing"
-"""
-
-def focus_terminal(pid, name):
-    """Bring the Windows Terminal tab running this Claude process to the front, on whichever
-    virtual desktop it is. Window titles alone can't tell chats apart (several can be called
-    "raad-iot", and only the active tab's title shows), so the chat's own tab is briefly given a
-    unique title through its terminal, found by that, then given its name back."""
-    try:
-        tty = os.readlink(f"/proc/{pid}/fd/0")
-    except OSError:
-        return False
-    if not tty.startswith("/dev/pts/"): return False
-    mark = "claude-dash-" + secrets.token_hex(4)
-    def title(t):
-        with open(tty, "w") as f: f.write(f"\033]0;{t}\007")
-    try:
-        title(mark)
-        env = dict(os.environ, DASH_MARK=mark, DASH_VDLIB=VDLIB, WSLENV="DASH_MARK:DASH_VDLIB")
-        r = subprocess.run(["/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe", "-NoProfile", "-Command", FOCUS_PS],
-                           capture_output=True, text=True, cwd="/mnt/c", env=env, timeout=30)
-        return r.stdout.strip().endswith("ok")
-    except (OSError, subprocess.TimeoutExpired):
-        return False
-    finally:
-        try: title("\u2733 " + name if name else "Claude Code")   # Claude Code's own idle title
-        except OSError: pass
+def manual(cwd, command):
+    """What to paste into a terminal when no terminal could be opened for the person."""
+    return f"cd {shlex.quote(cwd)} && {command}"
 
 def open_running(sid):
     a = agents(fresh=True).get(sid)
     if not a: return {"ok": False, "error": "not running any more"}
+    cwd = a.get("cwd") if os.path.isdir(a.get("cwd") or "") else HOME
     if a.get("kind") == "background":
-        cwd = a.get("cwd") if os.path.isdir(a.get("cwd") or "") else HOME
-        subprocess.Popen(["/mnt/c/Users/user/AppData/Local/Microsoft/WindowsApps/wt.exe", "-w", "0", "new-tab", "-p", "Ubuntu",
-                          "wsl.exe", "-d", "Ubuntu", "--cd", cwd, "--", "bash", "-lic", f"claude attach {a.get('id') or sid}"],
-                         cwd="/mnt/c", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        return {"ok": True, "how": "attached in a new terminal tab"}
-    if a.get("pid") and focus_terminal(int(a["pid"]), a.get("name")):
+        cmd = f"claude attach {a.get('id') or sid}"
+        if terminals.launch(cwd, cmd): return {"ok": True, "how": "attached in a new terminal tab"}
+        return {"ok": False, "copy": manual(cwd, cmd)}
+    if a.get("pid") and terminals.focus(int(a["pid"]), a.get("name")):
         return {"ok": True, "how": "switched to its terminal"}
-    return {"ok": False, "error": "couldn't find its tab - it's either outside Windows Terminal or in a tab with a locked title (opened with --suppressApplicationTitle)"}
+    return {"ok": False, "error": "couldn't find its terminal tab - switch to it yourself (tabs with a locked title can't be found)"}
 
 def transcript(sid):
     if not UUID.match(sid or ""): return None
@@ -204,7 +142,7 @@ def stop(sid):
     a = agents(fresh=True).get(sid)
     if not a or not a.get("pid"): return {"ok": False, "error": "not running"}
     pid = int(a["pid"])
-    cmd = open(f"/proc/{pid}/cmdline", "rb").read().replace(b"\0", b" ").decode(errors="ignore") if os.path.exists(f"/proc/{pid}") else ""
+    cmd = subprocess.run(["ps", "-o", "command=", "-p", str(pid)], capture_output=True, text=True).stdout
     if "claude" not in cmd: return {"ok": False, "error": "pid is not a Claude process"}
     os.kill(pid, signal.SIGTERM)
     return {"ok": True}
@@ -218,10 +156,8 @@ def open_chat(sid, view=False):
         cwd = INDEX.get(p).cwd or HOME
         inner = f"claude --resume {sid}"
     cwd = cwd if os.path.isdir(cwd) else HOME
-    subprocess.Popen(["/mnt/c/Users/user/AppData/Local/Microsoft/WindowsApps/wt.exe", "-w", "0", "new-tab", "-p", "Ubuntu",
-                      "wsl.exe", "-d", "Ubuntu", "--cd", cwd, "--", "bash", "-lic", inner],
-                     cwd="/mnt/c", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    return {"ok": True}
+    if terminals.launch(cwd, inner): return {"ok": True}
+    return {"ok": False, "copy": manual(cwd, inner)}
 
 def chat(sid):
     p = transcript(sid)

@@ -143,5 +143,26 @@ class WaitingTest(unittest.TestCase):
         self.assertEqual(server.waiting({}, {SID: ("p", E)}), {})   # not running
 
 
+class TerminalTest(unittest.TestCase):
+    def test_shell_line_quotes_folder(self):
+        import terminals
+        line = terminals._shell_line("/tmp/it's here", "claude --resume x")
+        self.assertTrue(line.startswith("cd '/tmp/it'\"'\"'s here' && claude --resume x; exec "))
+
+    def test_tty_of_unknown_pid(self):
+        import terminals
+        self.assertIsNone(terminals.tty_of(999999999))
+
+
+class ProjectTest(unittest.TestCase):
+    def test_worktrees_and_subfolders_belong_to_the_repo(self):
+        import subprocess, server
+        repo = tempfile.mkdtemp(); os.makedirs(os.path.join(repo, "src"))
+        subprocess.run(["git", "init", "-q", repo], check=True)
+        self.assertEqual(server.project(os.path.join(repo, "src")), server.project(repo))
+        self.assertEqual(server.project(repo + "/.claude/worktrees/gone"), server.project(repo))
+        self.assertEqual(server.project("/no/such/dir"), "/no/such/dir")
+
+
 if __name__ == "__main__":
     unittest.main()

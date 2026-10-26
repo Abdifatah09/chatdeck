@@ -14,7 +14,8 @@ Python standard library only, no dependencies.
   limits with a forecast of when you'd hit them at the current pace.
 - **Cleanup** – delete empty chats or chats older than 7, 30 or 90 days. Shows disk usage.
   Running chats are never deleted.
-- Sort by recent, size, cost or messages. Group by project. Light and dark themes.
+- **By project** view: one section per project (git repo, including its worktrees and subfolders)
+  with its running and saved chats. Sort by recent, size, cost or messages. Light and dark themes.
   Keyboard shortcuts: `/` search, `j`/`k` move, `Enter` read, `r` resume, `x` select, `Del` delete, `e` rename, `?` help.
 
 ## Run
@@ -53,7 +54,25 @@ To get the "Waiting for you" badge, add this to `~/.claude/settings.json`:
 python3 -m unittest discover -s tests
 ```
 
-## Status
+## Terminals
 
-Opening and resuming chats currently uses Windows Terminal from WSL. Support for macOS and
-Linux terminals is planned.
+**Resume**, **Open** and **Agents view** open or find a terminal for you:
+
+| Platform | Opens chats in | Open on a running chat |
+|---|---|---|
+| WSL | Windows Terminal (new tab) | finds its tab on any virtual desktop and switches to it |
+| macOS | Terminal, or iTerm2 if you run the dashboard from it | finds its tab by tty |
+| Linux | gnome-terminal, konsole, kitty, alacritty, wezterm, xfce4-terminal, tilix, foot or xterm | finds its window with `wmctrl` or `xdotool` (X11) |
+
+When no terminal can be opened, the dashboard copies the command to paste instead.
+
+Settings (environment variables):
+
+- `CLAUDE_DASH_PORT`: port, default 47123
+- `CLAUDE_DASH_TERMINAL`: which terminal to use, e.g. `kitty` or `iterm`
+- `CLAUDE_DASH_DIR`: where the dashboard keeps its data, default `~/.claude/dash`
+- `CLAUDE_DASH_VDLIB` (WSL): Windows path to [VirtualDesktopLib.cs](https://github.com/MScholtes/VirtualDesktop), which makes
+  switching to a chat on another virtual desktop reliable
+
+Finding a running chat works by briefly giving its tab a unique title, so it doesn't work for
+tabs whose title is locked (Windows Terminal's `suppressApplicationTitle`).

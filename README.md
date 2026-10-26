@@ -107,7 +107,7 @@ Start it with `chatdeck bubble`, or let `chatdeck autostart on` start it at logi
 
 | Platform | Opens chats in | Open on a running chat |
 |---|---|---|
-| WSL | Windows Terminal (new tab) | finds its tab on any virtual desktop and switches to it |
+| WSL | Windows Terminal (a new window each time) | finds its tab on any virtual desktop and switches to it |
 | macOS | Terminal, or iTerm2 if you run the dashboard from it | finds its tab by tty |
 | Linux | gnome-terminal, konsole, kitty, alacritty, wezterm, xfce4-terminal, tilix, foot or xterm | finds its window with `wmctrl` or `xdotool` (X11) |
 
@@ -121,6 +121,7 @@ Settings live in `~/.chatdeck/config.json`, and environment variables override t
 
 - `port` / `CHATDECK_PORT`: default 47123
 - `terminal` / `CHATDECK_TERMINAL`: which terminal to use, e.g. `kitty` or `iterm`
+- `tabs` / `CHATDECK_TABS` (WSL): `true` opens chats as tabs in your last Windows Terminal window instead of a new window each
 - `vdlib` / `CHATDECK_VDLIB` (WSL): Windows path to [VirtualDesktopLib.cs](https://github.com/MScholtes/VirtualDesktop),
   which makes switching to a chat on another virtual desktop reliable
 - `CHATDECK_DIR`: where chatdeck keeps its data, default `~/.chatdeck`

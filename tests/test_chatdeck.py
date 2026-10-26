@@ -303,6 +303,18 @@ class NewChatTest(Tmp):
             self.assertEqual(server.new_chat("/etc")["error"], "unknown project")
 
 
+class WslLaunchTest(unittest.TestCase):
+    def test_new_window_by_default_tabs_when_asked(self):
+        from chatdeck import terminals
+        calls = []
+        with unittest.mock.patch.object(terminals, "_win_exe", lambda *a: "wt.exe"), \
+             unittest.mock.patch.object(terminals, "_spawn", lambda args, **kw: calls.append(args) or True):
+            terminals._wsl_launch("/w/proj", "claude")
+            with unittest.mock.patch.dict(os.environ, {"CHATDECK_TABS": "true"}):
+                terminals._wsl_launch("/w/proj", "claude")
+        self.assertEqual(calls[0][1:3], ["-w", "new"]); self.assertEqual(calls[1][1:4], ["-w", "0", "new-tab"])
+
+
 class CompactTest(Tmp):
     def test_context_shrinks_at_the_compact_boundary(self):
         self.write(user("hi") + assistant([{"type": "text", "text": "hello"}], usage_={"input_tokens": 385000, "output_tokens": 5}))

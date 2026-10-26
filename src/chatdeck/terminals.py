@@ -82,7 +82,9 @@ def _wsl_launch(cwd, command):
     wt = _win_exe("wt.exe", "/mnt/c/Users/*/AppData/Local/Microsoft/WindowsApps/wt.exe")
     if not wt: return False
     distro = os.environ.get("WSL_DISTRO_NAME") or "Ubuntu"
-    return _spawn([wt, "-w", "0", "new-tab", "wsl.exe", "-d", distro, "--cd", cwd, "--", "bash", "-lic", command], cwd="/mnt/c")
+    # Each chat gets a window of its own; set "tabs": true in the config to open tabs in the last window instead.
+    where = ["-w", "0", "new-tab"] if str(config.get("tabs", "")).lower() in ("1", "true") else ["-w", "new"]
+    return _spawn([wt, *where, "wsl.exe", "-d", distro, "--cd", cwd, "--", "bash", "-lic", command], cwd="/mnt/c")
 
 
 def _wsl_focus(pid, name, typed=None):

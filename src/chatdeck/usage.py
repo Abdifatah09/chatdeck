@@ -67,12 +67,12 @@ class LimitHistory:
 
 
 def summary(entries, status_dir, history, today=None, project=None):
-    """entries: iterable of transcript Entry objects; project(cwd) names the project a folder belongs to."""
+    """entries: iterable of transcript Entry objects; project(entry) names the project a chat belongs to."""
     today = today or datetime.date.today()
     week = {(today - datetime.timedelta(days=i)).isoformat(): 0 for i in range(6, -1, -1)}
     by_proj = {}; tot = {"today": [0, 0, 0, 0], "week": [0, 0, 0, 0]}
     for e in entries:
-        proj = os.path.basename(((project or str)(e.cwd or "")).rstrip("/")) or "~"
+        proj = os.path.basename((project(e) if project else e.cwd or "").rstrip("/")) or "~"
         for day, v in e.days.items():
             if day in week:
                 n = v[0] + v[1] + v[3]   # fresh input + output + cache writes (cache reads are cheap re-reads)

@@ -26,13 +26,13 @@ def _assistant_text(c):
 
 class Entry:
     __slots__ = ("ino", "offset", "size", "mtime", "custom", "ai", "summary", "first", "cwd", "ctx", "msgs",
-                 "days", "seen", "cost", "text", "text_lc")
+                 "days", "seen", "cost", "text", "text_lc", "cwds")
 
     def __init__(self, ino):
         self.ino = ino; self.offset = 0; self.size = 0; self.mtime = 0.0
         self.custom = self.ai = self.summary = self.first = self.cwd = None
         self.ctx = self.msgs = 0; self.days = {}; self.seen = set(); self.cost = 0.0
-        self.text = []; self.text_lc = ""
+        self.text = []; self.text_lc = ""; self.cwds = {}   # folder -> lines written there, to tell where the chat mostly worked
 
     @property
     def title(self):
@@ -46,7 +46,8 @@ class Entry:
         elif t == "cost-state": self.cost = float(d.get("totalCostUSD") or 0)
         elif t == "system" and d.get("subtype") == "compact_boundary":   # context shrinks right away, not at the next reply
             self.ctx = (d.get("compactMetadata") or {}).get("postTokens") or self.ctx
-        if d.get("cwd"): self.cwd = d["cwd"]
+        if d.get("cwd"):
+            self.cwd = d["cwd"]; self.cwds[self.cwd] = self.cwds.get(self.cwd, 0) + 1
         if d.get("isSidechain") or d.get("isMeta"): return
         m = d.get("message") or {}
         if t == "user":

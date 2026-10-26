@@ -69,23 +69,39 @@ def waiting(act, chats):
             pass
     return out
 
+def _as_written(cwd, real):
+    """git answers with symlinks resolved (macOS: /var is /private/var); give the folder as cwd spells it."""
+    d = cwd
+    while True:
+        if os.path.realpath(d) == real: return d
+        up = os.path.dirname(d)
+        if up == d: return real
+        d = up
+
 _projects = {}
 def project(cwd):
     """The project a folder belongs to: the main checkout of its git repo (so subfolders and
     worktrees count as the repo itself), or the folder when it isn't in a repo."""
     if not cwd: return ""
     if cwd not in _projects:
-        # Claude's worktrees, even once removed; resolved like git resolves paths (macOS: /var is /private/var)
-        root = os.path.realpath(cwd.split(os.sep + ".claude" + os.sep + "worktrees" + os.sep)[0])
+        root = cwd.split(os.sep + ".claude" + os.sep + "worktrees" + os.sep)[0]   # Claude's worktrees, even once removed
         try:
             r = subprocess.run(["git", "-C", cwd, "rev-parse", "--path-format=absolute", "--git-common-dir"],
                                capture_output=True, text=True, timeout=5)
             common = r.stdout.strip()
-            if r.returncode == 0 and os.path.basename(common) == ".git": root = os.path.dirname(common)
+            if r.returncode == 0 and os.path.basename(common) == ".git": root = _as_written(cwd, os.path.dirname(common))
         except (OSError, subprocess.TimeoutExpired):
             pass
         _projects[cwd] = root
     return _projects[cwd].replace(HOME, "~", 1)
+
+def chat_project(e, start_cwd=None):
+    """The project a chat belongs to: the one it did most of its work in. A chat started in your home
+    folder that then worked in ~/code/app belongs to app, not to the home folder."""
+    totals = {}
+    for cwd, n in (e.cwds if e else {}).items():
+        p = project(cwd); totals[p] = totals.get(p, 0) + n
+    return max(totals, key=totals.get) if totals else project(start_cwd or (e.cwd if e else ""))
 
 # Names given to chats while they were running. Claude Code keeps a running chat's name in memory
 # and rewrites it, so the new name is shown from here and written into the chat once it ends.
@@ -122,7 +138,7 @@ def state():
     for sid, (p, e) in chats.items():
         a = act.get(sid, {})
         out.append({"sid": sid, "name": pend.get(sid) or a.get("name") or e.title or "(empty)",
-                    "cwd": (a.get("cwd") or e.cwd or "").replace(HOME, "~"), "project": project(a.get("cwd") or e.cwd),
+                    "cwd": (a.get("cwd") or e.cwd or "").replace(HOME, "~"), "project": chat_project(e, a.get("cwd")),
                     "ctx": e.ctx, "msgs": e.msgs, "mtime": e.mtime, "size": e.size, "cost": round(e.cost, 2),
                     "status": a.get("status"), "kind": a.get("kind"), "started": a.get("startedAt"), "waiting": wait.get(sid)})
     for sid, a in act.items():  # running but no transcript yet
@@ -132,7 +148,7 @@ def state():
                         "ctx": 0, "msgs": 0, "mtime": time.time(), "size": 0, "cost": 0, "status": a.get("status"),
                         "kind": a.get("kind"), "started": a.get("startedAt"), "waiting": wait.get(sid)})
     out.sort(key=lambda x: -x["mtime"])
-    return {"chats": out, "now": time.time(), "usage": usage.summary([e for _, e in chats.values()], STATUS, LIMITS, project=project)}
+    return {"chats": out, "now": time.time(), "usage": usage.summary([e for _, e in chats.values()], STATUS, LIMITS, project=chat_project)}
 
 def manual(cwd, command):
     """What to paste into a terminal when no terminal could be opened for the person."""

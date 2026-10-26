@@ -165,6 +165,17 @@ class ProjectTest(unittest.TestCase):
         self.assertEqual(server.project(repo + "/.claude/worktrees/gone"), server.project(repo))
         self.assertEqual(server.project("/no/such/dir"), "/no/such/dir")
 
+    def test_chat_belongs_where_it_did_most_of_its_work(self):
+        from chatdeck import server
+        import subprocess
+        repo = tempfile.mkdtemp(); os.makedirs(os.path.join(repo, "src"))
+        subprocess.run(["git", "init", "-q", repo], check=True)
+        e = transcripts.Entry(0)
+        for cwd in ["/home/me"] * 3 + [repo, os.path.join(repo, "src")] * 2:   # 3 lines at home, 4 in the repo
+            e.feed({"type": "user", "cwd": cwd, "message": {"content": "hi"}})
+        self.assertEqual(server.chat_project(e, "/home/me"), server.project(repo))
+        self.assertEqual(server.chat_project(None, "/home/me"), "/home/me")
+
 
 class SetupTest(unittest.TestCase):
     def setUp(self):

@@ -1,21 +1,26 @@
 #!/usr/bin/env python3
 """Claude chats dashboard: local-only server for the AOC sidebar.
 Lists running sessions (claude agents --json) and saved transcripts under
-~/.claude/projects, and can delete saved chats, stop sessions, and open a chat
-in Windows Terminal. Binds 127.0.0.1 only; every API call needs the per-run token
-embedded in the page (custom header => cross-site pages can't call it)."""
-import json, os, glob, secrets, signal, subprocess, time, re
+~/.claude/projects, and can view, search, rename, export and delete saved chats, stop
+sessions, and open a chat in Windows Terminal. Binds 127.0.0.1 only; every API call needs
+the per-run token embedded in the page (custom header => cross-site pages can't call it)."""
+import json, os, glob, secrets, signal, subprocess, threading, time
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
+from urllib.parse import urlparse, parse_qs, quote
+
+import transcripts, usage
+from transcripts import UUID
 
 HOME = os.path.expanduser("~")
 PROJECTS = os.path.join(HOME, ".claude", "projects")
-PORT = 47123
+DATA = os.environ.get("CLAUDE_DASH_DIR") or os.path.join(HOME, ".claude", "dash")
+STATUS, WAITING = os.path.join(DATA, "status"), os.path.join(DATA, "waiting")
+PORT = int(os.environ.get("CLAUDE_DASH_PORT") or 47123)
 TOKEN = secrets.token_hex(16)
 PAGE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "index.html")
-UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
-_cache = {}  # path -> ((mtime, size), info)
+INDEX = transcripts.Index(PROJECTS)
+LIMITS = usage.LimitHistory(os.path.join(DATA, "limits-history.jsonl"))
 
-import threading
 _agents = (0.0, {})
 _agents_lock = threading.Lock()
 def _fetch_agents():
@@ -37,77 +42,39 @@ def agents(fresh=False):
     destructive actions (delete/stop) ask for a fresh copy first."""
     return _fetch_agents() if fresh else _agents[1]
 
-def scan(path):
-    st = os.stat(path); key = (st.st_mtime, st.st_size)
-    hit = _cache.get(path)
-    if hit and hit[0] == key:
-        return hit[1]
-    title = first = cwd = None; ctx = msgs = 0; days = {}; seen_ids = set()
-    with open(path, errors="ignore") as f:
-        for line in f:
-            try: d = json.loads(line)
-            except Exception: continue
-            t = d.get("type")
-            if t == "summary" and d.get("summary"): title = d["summary"]
-            if t == "custom-title" and d.get("customTitle"): title = d["customTitle"]
-            if d.get("cwd"): cwd = d["cwd"]
-            if t == "user":
-                c = d.get("message", {}).get("content")
-                if isinstance(c, str) and c.strip() and not c.lstrip().startswith("<"):
-                    msgs += 1; first = first or c.strip().replace("\n", " ")[:90]
-            elif t == "assistant":
-                u = d.get("message", {}).get("usage") or {}
-                v = u.get("input_tokens", 0) + u.get("cache_read_input_tokens", 0) + u.get("cache_creation_input_tokens", 0)
-                if v: ctx = v
-                mid = d.get("message", {}).get("id"); ts = d.get("timestamp", "")
-                if u and mid and mid not in seen_ids and len(ts) >= 10:
-                    seen_ids.add(mid); day = days.setdefault(ts[:10], [0, 0, 0, 0])
-                    day[0] += u.get("input_tokens", 0); day[1] += u.get("output_tokens", 0)
-                    day[2] += u.get("cache_read_input_tokens", 0); day[3] += u.get("cache_creation_input_tokens", 0)
-    info = {"title": title or first, "cwd": cwd, "ctx": ctx, "msgs": msgs, "days": days}
-    _cache[path] = (key, info)
-    return info
+def waiting(act, chats):
+    """{sid: message} for running chats stuck on a permission prompt or question. A mark from the
+    waiting hook counts until the transcript is written to after it (the prompt was answered)."""
+    out = {}
+    for f in glob.glob(os.path.join(WAITING, "*.json")):
+        sid = os.path.basename(f)[:-5]
+        try:
+            if sid not in act:
+                if os.path.getmtime(f) < time.time() - 3600: os.remove(f)
+                continue
+            with open(f) as fh: w = json.load(fh)
+            hit = chats.get(sid)
+            if not hit or hit[1].mtime <= w["at"] + 1.5:
+                out[sid] = w.get("message") or "Waiting for you"
+        except (OSError, ValueError, KeyError):
+            pass
+    return out
 
 def state():
-    act = agents(); out = []
-    for p in glob.glob(os.path.join(PROJECTS, "*", "*.jsonl")):
-        sid = os.path.basename(p)[:-6]
-        if not UUID.match(sid): continue
-        i = scan(p); a = act.get(sid, {})
-        out.append({"sid": sid, "name": a.get("name") or i["title"] or "(empty)",
-                    "cwd": (a.get("cwd") or i["cwd"] or "").replace(HOME, "~"),
-                    "ctx": i["ctx"], "msgs": i["msgs"], "mtime": os.path.getmtime(p), "size": os.path.getsize(p),
-                    "status": a.get("status"), "kind": a.get("kind")})
-    seen = {x["sid"] for x in out}
+    act = agents(); chats = INDEX.all(); wait = waiting(act, chats); out = []
+    for sid, (p, e) in chats.items():
+        a = act.get(sid, {})
+        out.append({"sid": sid, "name": a.get("name") or e.title or "(empty)",
+                    "cwd": (a.get("cwd") or e.cwd or "").replace(HOME, "~"),
+                    "ctx": e.ctx, "msgs": e.msgs, "mtime": e.mtime, "size": e.size, "cost": round(e.cost, 2),
+                    "status": a.get("status"), "kind": a.get("kind"), "waiting": wait.get(sid)})
     for sid, a in act.items():  # running but no transcript yet
-        if sid not in seen:
+        if sid not in chats:
             out.append({"sid": sid, "name": a.get("name") or "(new chat)", "cwd": (a.get("cwd") or "").replace(HOME, "~"),
-                        "ctx": 0, "msgs": 0, "mtime": time.time(), "size": 0, "status": a.get("status"), "kind": a.get("kind")})
+                        "ctx": 0, "msgs": 0, "mtime": time.time(), "size": 0, "cost": 0, "status": a.get("status"),
+                        "kind": a.get("kind"), "waiting": wait.get(sid)})
     out.sort(key=lambda x: -x["mtime"])
-    return {"chats": out, "now": time.time(), "usage": usage(glob.glob(os.path.join(PROJECTS, "*", "*.jsonl")))}
-
-def usage(files):
-    import datetime
-    today = datetime.date.today(); week = {(today - datetime.timedelta(days=i)).isoformat(): 0 for i in range(6, -1, -1)}
-    by_proj = {}; tot = {"today": [0, 0, 0, 0], "week": [0, 0, 0, 0]}
-    for p in files:
-        i = _cache.get(p, (None, {}))[1]; proj = os.path.basename((i.get("cwd") or "").rstrip("/")) or "~"
-        for day, v in i.get("days", {}).items():
-            if day in week:
-                n = v[0] + v[1] + v[3]   # fresh input + output + cache writes (cache reads are cheap re-reads)
-                week[day] += n; by_proj[proj] = by_proj.get(proj, 0) + n
-                tot["week"] = [a + b for a, b in zip(tot["week"], v)]
-                if day == today.isoformat(): tot["today"] = [a + b for a, b in zip(tot["today"], v)]
-    limits = None; cost = 0.0
-    st = sorted(glob.glob(os.path.join(HOME, ".claude", "dash", "status", "*.json")), key=os.path.getmtime)
-    for f in st:
-        try:
-            d = json.load(open(f))
-            if os.path.getmtime(f) > time.time() - 86400: cost += float((d.get("cost") or {}).get("total_cost_usd") or 0)
-            if d.get("rate_limits"): limits = {"data": d["rate_limits"], "at": os.path.getmtime(f)}
-        except Exception: pass
-    return {"week": [[k, v] for k, v in week.items()], "by_project": sorted(by_proj.items(), key=lambda x: -x[1])[:5],
-            "today": tot["today"], "week_tot": tot["week"], "limits": limits, "cost_24h": round(cost, 2)}
+    return {"chats": out, "now": time.time(), "usage": usage.summary([e for _, e in chats.values()], STATUS, LIMITS)}
 
 def focus_window(name):
     """Bring the Windows Terminal window whose title contains this chat name to the front."""
@@ -158,23 +125,32 @@ def open_running(sid):
     return {"ok": False, "error": "it's open in a terminal tab, but that tab isn't the active one in its window - switch to it there"}
 
 def transcript(sid):
+    if not UUID.match(sid or ""): return None
     hits = glob.glob(os.path.join(PROJECTS, "*", sid + ".jsonl"))
-    return hits[0] if hits else None
+    if not hits or not os.path.realpath(hits[0]).startswith(os.path.realpath(PROJECTS) + os.sep): return None
+    return hits[0]
 
 def delete(sids):
     act = agents(fresh=True); done, refused = [], []
     for sid in sids:
-        if not UUID.match(sid) or sid in act:
-            refused.append(sid); continue
         p = transcript(sid)
-        if not p or not os.path.realpath(p).startswith(os.path.realpath(PROJECTS) + os.sep):
+        if not p or sid in act:
             refused.append(sid); continue
-        os.remove(p); _cache.pop(p, None)
+        os.remove(p); INDEX.forget(p)
         side = p[:-6]  # sibling folder with this chat's tool output / subagents
         if os.path.isdir(side):
             subprocess.run(["rm", "-rf", "--", side])
         done.append(sid)
     return {"deleted": done, "refused": refused}
+
+def rename(sid, title):
+    title = " ".join(str(title or "").split())[:80]
+    p = transcript(sid)
+    if not p or not title: return {"ok": False, "error": "no such chat"}
+    if sid in agents(fresh=True):
+        return {"ok": False, "error": "it's running - type /rename in the chat instead"}
+    transcripts.rename(p, sid, title)
+    return {"ok": True, "title": title}
 
 def stop(sid):
     a = agents(fresh=True).get(sid)
@@ -189,8 +165,9 @@ def open_chat(sid, view=False):
     if view:
         inner = "claude agents"; cwd = HOME
     else:
-        if not UUID.match(sid): return {"ok": False}
-        p = transcript(sid); cwd = (scan(p)["cwd"] if p else None) or HOME
+        p = transcript(sid)
+        if not p: return {"ok": False}
+        cwd = INDEX.get(p).cwd or HOME
         inner = f"claude --resume {sid}"
     cwd = cwd if os.path.isdir(cwd) else HOME
     subprocess.Popen(["/mnt/c/Users/user/AppData/Local/Microsoft/WindowsApps/wt.exe", "-w", "0", "new-tab", "-p", "Ubuntu",
@@ -198,25 +175,48 @@ def open_chat(sid, view=False):
                      cwd="/mnt/c", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return {"ok": True}
 
+def chat(sid):
+    p = transcript(sid)
+    if not p: return None
+    e = INDEX.get(p); a = agents().get(sid, {})
+    return dict(transcripts.messages(p), sid=sid, name=a.get("name") or e.title or "(empty)", running=bool(a),
+                cwd=(e.cwd or "").replace(HOME, "~"), cost=round(e.cost, 2), size=e.size, mtime=e.mtime)
+
 class H(BaseHTTPRequestHandler):
     def log_message(self, *a): pass
-    def send(self, code, body, ctype="application/json"):
+    def send(self, code, body, ctype="application/json", extra=()):
         b = body if isinstance(body, bytes) else json.dumps(body).encode()
         self.send_response(code); self.send_header("Content-Type", ctype)
-        self.send_header("Cache-Control", "no-store"); self.end_headers(); self.wfile.write(b)
+        self.send_header("Cache-Control", "no-store")
+        for k, v in extra: self.send_header(k, v)
+        self.end_headers(); self.wfile.write(b)
     def authed(self):
         return self.headers.get("X-Token") == TOKEN and self.headers.get("Host", "").split(":")[0] in ("localhost", "127.0.0.1")
     def do_GET(self):
-        if self.path == "/":
-            return self.send(200, open(PAGE).read().replace("__TOKEN__", TOKEN).encode(), "text/html; charset=utf-8")
-        if self.path == "/api/state" and self.authed():
-            return self.send(200, state())
+        u = urlparse(self.path); q = {k: v[0] for k, v in parse_qs(u.query).items()}
+        if u.path == "/":
+            with open(PAGE) as f:
+                return self.send(200, f.read().replace("__TOKEN__", TOKEN).encode(), "text/html; charset=utf-8")
+        if not self.authed(): return self.send(404, {"error": "not found"})
+        if u.path == "/api/state": return self.send(200, state())
+        if u.path == "/api/search": return self.send(200, INDEX.search(q.get("q", "")[:200]))
+        if u.path == "/api/chat":
+            c = chat(q.get("sid", ""))
+            return self.send(200, c) if c else self.send(404, {"error": "no such chat"})
+        if u.path == "/api/export":
+            c = transcript(q.get("sid", ""))
+            if not c: return self.send(404, {"error": "no such chat"})
+            title = INDEX.get(c).title or "chat"
+            name = "".join(ch if ch.isalnum() or ch in "-_ " else "-" for ch in title).strip()[:60] or "chat"
+            return self.send(200, transcripts.markdown(c, title).encode(), "text/markdown; charset=utf-8",
+                             [("Content-Disposition", f"attachment; filename*=UTF-8''{quote(name)}.md")])
         self.send(404, {"error": "not found"})
     def do_POST(self):
         if not self.authed(): return self.send(403, {"error": "forbidden"})
         n = int(self.headers.get("Content-Length") or 0)
         body = json.loads(self.rfile.read(n) or b"{}")
         if self.path == "/api/delete": return self.send(200, delete(body.get("sids", [])))
+        if self.path == "/api/rename": return self.send(200, rename(body.get("sid", ""), body.get("title", "")))
         if self.path == "/api/stop": return self.send(200, stop(body.get("sid", "")))
         if self.path == "/api/open": return self.send(200, open_chat(body.get("sid", ""), body.get("view", False)))
         if self.path == "/api/open-running": return self.send(200, open_running(body.get("sid", "")))

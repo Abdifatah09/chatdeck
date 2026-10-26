@@ -1,0 +1,336 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>chatdeck</title>
+<link rel="icon" href="/logo.svg" type="image/svg+xml"><link rel="icon" href="/logo-192.png" sizes="192x192"><link rel="manifest" href="/manifest.webmanifest">
+<style>
+:root{--bg:#0f1115;--panel:#171a21;--panel2:#1a1e26;--line:#262a33;--line2:#3a4150;--text:#e6e8ee;--dim:#8b92a1;--green:#3ecf8e;--amber:#f5b942;--red:#f06a6a;
+ --btn:#222733;--input:#14171d;--bar:#232733;--chart:#4a7fd4;--chart2:#7fb0ff;--toast:#24406b;--toasttext:#e6e8ee;--offbg:#3a1d1d;--offtext:#ffb4b4;
+ --you:#1d2a40;--mark:#6b5310;--code:#11141a;--amberbg:rgba(245,185,66,.08)}
+:root[data-theme=light]{--bg:#f6f7f9;--panel:#fff;--panel2:#f0f2f5;--line:#e1e4ea;--line2:#c5cad4;--text:#1b1f27;--dim:#646c7a;--green:#13945e;--amber:#b7790a;--red:#c93c3c;
+ --btn:#fff;--input:#fff;--bar:#e6e9ef;--chart:#4a7fd4;--chart2:#2f62b8;--toast:#1b1f27;--toasttext:#fff;--offbg:#fde8e8;--offtext:#8a1f1f;
+ --you:#e7effc;--mark:#ffe08a;--code:#f0f2f5;--amberbg:rgba(183,121,10,.08)}
+@media (prefers-color-scheme:light){:root:not([data-theme=dark]){--bg:#f6f7f9;--panel:#fff;--panel2:#f0f2f5;--line:#e1e4ea;--line2:#c5cad4;--text:#1b1f27;--dim:#646c7a;--green:#13945e;--amber:#b7790a;--red:#c93c3c;
+ --btn:#fff;--input:#fff;--bar:#e6e9ef;--chart:#4a7fd4;--chart2:#2f62b8;--toast:#1b1f27;--toasttext:#fff;--offbg:#fde8e8;--offtext:#8a1f1f;
+ --you:#e7effc;--mark:#ffe08a;--code:#f0f2f5;--amberbg:rgba(183,121,10,.08)}}
+*{box-sizing:border-box}html,body{height:100%}body{margin:0;background:var(--bg);color:var(--text);font:13px/1.4 "Segoe UI",system-ui,sans-serif;display:flex;flex-direction:column}
+header{padding:12px 14px 10px;border-bottom:1px solid var(--line)}
+.top{display:flex;align-items:center;gap:6px}h1{font-size:15px;margin:0;font-weight:600;flex:1}
+.stats{color:var(--dim);font-size:12px;margin-top:4px}.stats b{color:var(--text)}.stats .w{color:var(--amber);font-weight:600}
+main{flex:1;overflow:auto;padding:12px 14px}
+h2{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin:4px 0 8px;font-weight:600;display:flex;align-items:center;gap:6px}
+.btn{background:var(--btn);border:1px solid var(--line);color:var(--text);padding:3px 8px;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap;font-family:inherit}
+.btn:hover{border-color:var(--line2)}.btn.busy{opacity:.55;cursor:progress}.btn.danger{color:var(--red)}.btn:disabled{opacity:.4;cursor:default}.btn.icon{padding:3px 6px;min-width:26px;display:inline-flex;align-items:center;justify-content:center;height:24px}.btn.icon svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+select.btn{padding:3px 4px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:9px 10px;margin-bottom:7px}
+.card.waiting{border-color:var(--amber);background:linear-gradient(var(--amberbg),var(--amberbg)),var(--panel)}
+.badge{display:inline-block;background:var(--amber);color:#1b1f27;font-size:11px;font-weight:600;border-radius:4px;padding:1px 6px;margin-top:5px}
+.row{display:flex;align-items:center;gap:7px}.name{font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--dim);flex:none}.dot.busy{background:var(--green);animation:p 1.6s infinite}.dot.wait{background:var(--amber);animation:pa 1.2s infinite}
+@keyframes p{0%{box-shadow:0 0 0 0 rgba(62,207,142,.6)}70%{box-shadow:0 0 0 6px rgba(62,207,142,0)}100%{box-shadow:0 0 0 0 rgba(62,207,142,0)}}
+@keyframes pa{0%{box-shadow:0 0 0 0 rgba(245,185,66,.7)}70%{box-shadow:0 0 0 7px rgba(245,185,66,0)}100%{box-shadow:0 0 0 0 rgba(245,185,66,0)}}
+.meta{color:var(--dim);font-size:11.5px;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar{height:5px;background:var(--bar);border-radius:4px;overflow:hidden;margin-top:6px}.bar i{display:block;height:100%}
+.ok{color:var(--green)}.warn{color:var(--amber)}.bad{color:var(--red)}
+.tool{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center}
+input[type=search],input.ren{flex:1;min-width:120px;background:var(--input);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:4px 8px;font-size:12px;font-family:inherit}
+label.chk{color:var(--dim);font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer}
+.saved{display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--line);border-left:2px solid transparent}.saved:hover{background:var(--panel2)}
+.saved.cur{background:var(--panel2);border-left-color:var(--chart)}
+.saved .txt{flex:1;min-width:0;cursor:pointer}.saved .name{font-weight:500}
+.snip{color:var(--dim);font-size:11.5px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-style:italic}
+mark{background:var(--mark);color:inherit;border-radius:2px;padding:0 1px}
+.chatsHead{display:flex;align-items:center;gap:8px;margin:16px 0 8px}
+.seg{display:inline-flex;border:1px solid var(--line2);border-radius:7px;overflow:hidden}.seg button{background:var(--btn);color:var(--dim);border:0;padding:4px 11px;font:inherit;font-size:12px;cursor:pointer}
+.seg button+button{border-left:1px solid var(--line2)}.seg button.on{background:var(--chart);color:#fff;font-weight:600}.seg button:not(.on):hover{color:var(--text)}
+.sub{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin:12px 0 6px;font-weight:600}
+.psec{border:1px solid var(--line);border-radius:10px;margin-bottom:9px;background:var(--panel);overflow:hidden}
+.phead{display:flex;align-items:baseline;gap:8px;padding:9px 11px;cursor:pointer;user-select:none}.phead:hover{background:var(--panel2)}
+.phead .pn{font-weight:650;font-size:14px;white-space:nowrap}.phead .pp{color:var(--dim);font-size:11.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.phead .pc{font-size:11.5px;color:var(--dim);white-space:nowrap}.phead .pc .r{color:var(--green);font-weight:600}.phead .pc .w{color:var(--amber);font-weight:600}
+.caret{display:inline-block;transition:transform .15s;color:var(--dim);width:10px}.psec.closed .caret{transform:rotate(-90deg)}
+.pbody{padding:2px 10px 6px;border-top:1px solid var(--line)}.psec.closed .pbody{display:none}.pbody .card{background:var(--panel2);margin-top:7px}.pbody .card.waiting{background:linear-gradient(var(--amberbg),var(--amberbg)),var(--panel2)}
+.pbody .saved:last-child{border-bottom:0}
+.group{font-size:11.5px;color:var(--dim);margin:12px 0 4px;display:flex;gap:6px}#run .group:first-child{margin-top:0}.group b{color:var(--text);font-weight:600}
+#off{display:none;background:var(--offbg);color:var(--offtext);padding:6px 14px;font-size:12px}
+#toast{position:fixed;bottom:12px;left:12px;right:12px;background:var(--toast);color:var(--toasttext);padding:7px 10px;border-radius:7px;opacity:0;transition:.2s;pointer-events:none;z-index:20}#toast.on{opacity:1}
+.empty{color:var(--dim);font-size:12px;padding:6px 2px}
+.welcome{background:var(--panel);border:1px dashed var(--line2);border-radius:9px;padding:14px;color:var(--dim);font-size:12.5px;line-height:1.55}.welcome b{color:var(--text)}
+code{font-family:Consolas,"Cascadia Mono",ui-monospace,monospace;font-size:12px;background:var(--code);border-radius:4px;padding:0 4px}
+.ugrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-bottom:8px}.tile{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:8px 10px}
+.tile .v{font-size:18px;font-weight:600;font-variant-numeric:tabular-nums}.tile .l{color:var(--dim);font-size:11px}
+.chart{display:flex;align-items:flex-end;gap:5px;height:56px;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:8px 10px 18px;position:relative;margin-bottom:8px}
+.chart div{flex:1;background:var(--chart);border-radius:3px 3px 0 0;position:relative;min-height:2px}.chart div.today{background:var(--chart2)}
+.chart div span{position:absolute;bottom:-15px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--dim)}
+.lim{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:8px 10px;margin-bottom:8px}.lim .bar{margin:4px 0 4px}
+.fc{font-size:11.5px;margin:0 0 7px}.fc:last-child{margin-bottom:0}
+.proj{color:var(--dim);font-size:11.5px}.proj b{color:var(--text);font-weight:500}
+/* chat viewer */
+#viewer{position:fixed;inset:0;background:var(--bg);display:none;flex-direction:column;z-index:10}#viewer.on{display:flex}
+#viewer header{display:flex;flex-direction:column;gap:6px}
+#vTitle{font-size:14px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#vBody{flex:1;overflow:auto;padding:12px 14px 24px}
+.m{margin:0 0 10px;white-space:pre-wrap;word-wrap:break-word;overflow-wrap:anywhere}
+.m.you{background:var(--you);border-radius:9px;padding:8px 10px;margin-left:24px}
+.m.ai{padding:0 2px}
+.m pre{background:var(--code);border-radius:6px;padding:7px 9px;overflow:auto;white-space:pre;font:12px/1.45 Consolas,"Cascadia Mono",ui-monospace,monospace;margin:6px 0}
+.who{font-size:11px;color:var(--dim);margin-bottom:2px;font-weight:600}
+.t{font:12px/1.4 Consolas,"Cascadia Mono",ui-monospace,monospace;color:var(--dim);margin:-4px 0 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.t b{color:var(--text);font-weight:600}
+details.r{margin:-6px 0 10px 12px;font-size:11.5px;color:var(--dim)}details.r summary{cursor:pointer}details.r.err summary{color:var(--red)}
+details.r pre{background:var(--code);border-radius:6px;padding:6px 8px;overflow:auto;max-height:260px;font:11.5px/1.4 Consolas,"Cascadia Mono",ui-monospace,monospace;color:var(--text);white-space:pre-wrap}
+.sep{text-align:center;color:var(--dim);font-size:11px;margin:14px 0;border-top:1px dashed var(--line);padding-top:6px}
+#viewer.notools .t,#viewer.notools details.r{display:none}
+#help{position:fixed;inset:auto 12px 50px 12px;background:var(--panel);border:1px solid var(--line2);border-radius:9px;padding:10px 12px;display:none;z-index:30;font-size:12px;box-shadow:0 6px 24px rgba(0,0,0,.3)}
+#help.on{display:block}#help div{display:flex;justify-content:space-between;padding:2px 0}#help kbd{font:11px Consolas,ui-monospace,monospace;background:var(--code);border:1px solid var(--line);border-radius:4px;padding:0 5px}
+</style></head><body>
+<header><div class="top"><img src="/logo.svg" alt="" width="20" height="20" style="flex:none"><h1>chatdeck</h1>
+ <button class="btn icon" id="soundBtn" title="Sound when a chat needs you"></button>
+ <button class="btn icon" id="themeBtn" title="Theme"></button>
+ <button class="btn icon" id="helpBtn" title="Keyboard shortcuts (?)">?</button>
+ <button class="btn" id="viewBtn" title="Open Claude's own sessions view">Agents view</button></div>
+<div class="stats"><span id="nWait"></span><b id="nRun">–</b> running · <b id="nSaved">–</b> saved (<b id="disk">–</b>) · open chats hold <b id="tok">–</b> tokens</div></header>
+<div id="off">Dashboard server not reachable – retrying…</div>
+<main><h2>Usage</h2><div id="usage"></div>
+<div class="chatsHead"><h2 style="margin:0;flex:1">Chats</h2><div class="seg" title="How to list chats"><button data-mode="list">Running &amp; saved</button><button data-mode="project">By project</button></div></div>
+<div class="tool"><input type="search" id="q" placeholder="Search names and messages  ( / )"></div>
+<div class="tool"><select class="btn" id="sort" title="Sort saved chats"><option value="recent">Recent</option><option value="size">Largest</option><option value="cost">Most expensive</option><option value="msgs">Most messages</option></select>
+ <span style="flex:1"></span><select class="btn danger" id="cleanup" title="Delete old or empty chats"></select>
+ <button class="btn danger" id="delSel" style="display:none">Delete selected</button></div>
+<div id="list"></div></main>
+<div id="viewer"><header><div class="top"><button class="btn" id="vBack" title="Back (Esc)">←</button><span id="vTitle"></span>
+  <button class="btn" id="vRen" title="Give this chat a name you'll recognise (e)">Rename</button></div>
+ <div class="meta" id="vMeta" style="margin:0"></div>
+ <div class="row"><button class="btn" id="vResume">Resume</button><button class="btn" id="vExport">Export .md</button>
+  <label class="chk"><input type="checkbox" id="vTools" checked> Tool calls</label><span style="flex:1"></span><button class="btn danger" id="vDel">Delete</button></div></header>
+ <div id="vBody"></div></div>
+<div id="help"><div><span>Search</span><kbd>/</kbd></div><div><span>Move through saved chats</span><span><kbd>j</kbd> <kbd>k</kbd></span></div>
+ <div><span>Read the chat</span><kbd>Enter</kbd></div><div><span>Resume in a terminal</span><kbd>r</kbd></div><div><span>Select for bulk delete</span><kbd>x</kbd></div>
+ <div><span>Delete</span><kbd>Del</kbd></div><div><span>Rename</span><kbd>e</kbd></div><div><span>Back / clear search</span><kbd>Esc</kbd></div></div>
+<div id="toast"></div>
+<script>
+const TOKEN="__TOKEN__";if(new URLSearchParams(location.search).has("popup"))document.title="chatdeck\u200b";  // reads "chatdeck"; the zero-width space lets the desktop bubble tell its pop-up from the full window
+const $=id=>document.getElementById(id);let S=[],sel=new Set(),now=Date.now()/1000,hits={},cur=null,V=null,first=true,waitSeen=new Set();
+const store={get(k,d){try{return localStorage.getItem(k)??d}catch{return d}},set(k,v){try{localStorage.setItem(k,v)}catch{}}};
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const ago=t=>{const s=now-t;return s<60?"just now":s<3600?Math.round(s/60)+" min ago":s<86400?Math.round(s/3600)+" h ago":Math.round(s/86400)+" d ago"};
+const k=n=>n>=1e6?(n/1e6).toFixed(1)+"M":n>=1e3?Math.round(n/1e3)+"k":String(n);
+const mb=n=>n>=1073741824?(n/1073741824).toFixed(1)+" GB":(n/1048576).toFixed(1)+" MB";
+const usd=n=>n?"$"+(n<10?n.toFixed(2):Math.round(n)):"";
+const dur=s=>{s=Math.max(0,s);const h=Math.floor(s/3600),m=Math.round(s%3600/60);return h>=24?Math.round(h/24)+"d":h?`${h}h ${m}m`:`${m}m`};
+const clock=t=>new Date(t*1000).toLocaleString([],{weekday:(t-now>86400?"short":undefined),hour:"2-digit",minute:"2-digit"});
+const cls=n=>n<150e3?"ok":n<400e3?"warn":"bad";const col={ok:"var(--green)",warn:"var(--amber)",bad:"var(--red)"};
+const toast=(m,ms=2200)=>{$("toast").textContent=m;$("toast").classList.add("on");clearTimeout(toast.t);toast.t=setTimeout(()=>$("toast").classList.remove("on"),ms)};
+const words=()=>$("q").value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+const hl=(s,ws=words())=>{let h=esc(s);for(const w of ws){const e=esc(w).replace(/[.*+?^${}()|[\]\\]/g,"\\$&");if(e)h=h.replace(new RegExp(`(${e})(?![^<]*>)`,"gi"),"<mark>$1</mark>")}return h};
+async function api(path,body){const ac=new AbortController();const to=setTimeout(()=>ac.abort(),body?45000:15000);const r=await fetch(path,{signal:ac.signal,method:body?"POST":"GET",headers:{"X-Token":TOKEN,"Content-Type":"application/json"},body:body?JSON.stringify(body):undefined}).finally(()=>clearTimeout(to));if(!r.ok)throw new Error(r.status);return r}
+const getJ=async(p,b)=>(await api(p,b)).json();
+
+/* theme + sound */
+const themes=["auto","light","dark"];
+const ICON={auto:'<circle cx="12" cy="12" r="9"/><path d="M12 3v18" /><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/>',
+  light:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  dark:'<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',
+  bell:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/>',
+  mute:'<path d="M6 8a6 6 0 0 1 9.5-4.9M18 8c0 7 3 9 3 9H9"/><path d="M6 8c0 7-3 9-3 9h3"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/><path d="M3 3l18 18"/>'};
+const svg=n=>`<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[n]}</svg>`;
+function applyTheme(){const t=store.get("theme","auto");if(t==="auto")delete document.documentElement.dataset.theme;else document.documentElement.dataset.theme=t;
+  $("themeBtn").innerHTML=svg(t);$("themeBtn").title=`Theme: ${t} (click to change)`}
+function applySound(){const on=store.get("sound","on")==="on";$("soundBtn").innerHTML=svg(on?"bell":"mute");$("soundBtn").title=on?"Sound on when a chat needs you":"Sound off"}
+let actx;function beep(){if(store.get("sound","on")!=="on")return;try{actx=actx||new AudioContext();const t=actx.currentTime;
+  for(const [f,d] of [[880,0],[1175,.16]]){const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=f;o.connect(g);g.connect(actx.destination);
+   g.gain.setValueAtTime(.0001,t+d);g.gain.exponentialRampToValueAtTime(.18,t+d+.02);g.gain.exponentialRampToValueAtTime(.0001,t+d+.22);o.start(t+d);o.stop(t+d+.25)}}catch{}}
+
+/* usage */
+function limitRow(label,o,fc,at){if(!o)return"";const pct=Math.round(o.used_percentage??o.utilization??o.percent??0);const c=pct<60?"ok":pct<85?"warn":"bad";
+  const rs=o.resets_at?(typeof o.resets_at==="number"&&o.resets_at<1e12?o.resets_at:Date.parse(o.resets_at)/1000):null;
+  let line="";
+  if(rs&&rs<now)line=`<span class="ok">Reset ${clock(rs)} – updates when a chat next runs</span>`;
+  else if(pct>=100)line=`<span class="bad">Limit reached</span>${rs?` · resets ${clock(rs)}`:""}`;
+  else{const r=rs?` · resets ${clock(rs)}`:"";
+    if(fc&&fc.eta)line=`<span class="${fc.eta-now<3600?"bad":"warn"}">~${dur(fc.eta-now)} left at this pace</span> (≈${clock(fc.eta)})${r}`;
+    else if(fc&&fc.rate>0)line=`<span class="ok">On pace to stay under</span>${r}`;
+    else if(fc&&fc.rate===0)line=`Not rising right now${r}`;
+    else line=`Forecast after ~15 min of use${r}`}
+  return `<div class="row"><span style="flex:1">${label}</span><b class="${c}">${pct}%</b></div><div class="bar"><i style="width:${Math.min(100,pct)}%;background:${col[c]}"></i></div><div class="meta fc">${line}</div>`}
+function renderUsage(U){if(!U)return;const t=U.today,w=U.week_tot,fresh=a=>a[0]+a[1]+a[3];
+  const max=Math.max(1,...U.week.map(x=>x[1]));const dn=d=>["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][new Date(d+"T12:00").getDay()];
+  let lim="";if(U.limits&&U.limits.data){const L=U.limits.data,F=U.limits.forecast||{};
+    lim=`<div class="lim">${limitRow("5-hour limit",L.five_hour||L["5h"],F.five_hour)}${limitRow("Weekly limit",L.seven_day||L.weekly||L["7d"],F.seven_day)}</div>`}
+  else lim=`<div class="meta" style="margin-bottom:8px;white-space:normal">Plan limits appear here once a Claude session updates its status line (needs the status-line hook – see README).</div>`;
+  $("usage").innerHTML=`<div class="ugrid"><div class="tile"><div class="v">${k(fresh(t))}</div><div class="l">tokens today</div></div>
+   <div class="tile"><div class="v">${k(fresh(w))}</div><div class="l">last 7 days</div></div>
+   <div class="tile"><div class="v">${U.cost_24h?("$"+U.cost_24h.toFixed(2)):"–"}</div><div class="l">API-equivalent cost (24h)</div></div></div>
+   ${lim}<div class="chart">${U.week.map((x,i)=>`<div class="${i===6?"today":""}" style="height:${Math.round(x[1]/max*100)}%" title="${k(x[1])} tokens"><span>${dn(x[0])}</span></div>`).join("")}</div>
+   <div class="proj">Top this week: ${U.by_project.map(([p,n])=>`<b>${esc(p)}</b> ${k(n)}`).join(" · ")||"–"}</div>`}
+
+/* lists */
+const mode=()=>store.get("mode","list")==="project"?"project":"list";
+const pkey=x=>x.project||x.cwd||"(no folder)";
+const pname=k=>k==="~"?"Home folder":k.split("/").filter(Boolean).pop()||k;
+let collapsed=new Set();try{collapsed=new Set(JSON.parse(store.get("collapsed","[]")))}catch{}
+function savedFiltered(){const ws=words();let L=S.filter(x=>!x.status);
+  if(ws.length)L=L.filter(x=>hits[x.sid]!==undefined||ws.every(w=>(x.name+" "+x.cwd).toLowerCase().includes(w)));
+  const by={recent:x=>-x.mtime,size:x=>-x.size,cost:x=>-x.cost,msgs:x=>-x.msgs}[$("sort").value];return L.sort((a,b)=>by(a)-by(b))}
+/* orders stay put between refreshes (start time, not last activity) so nothing jumps while you aim at it */
+const running=()=>S.filter(x=>x.status).sort((a,b)=>!!b.waiting-!!a.waiting||(b.started||0)-(a.started||0));
+/* one entry per project: its running chats, its saved chats (after search and sort), and totals */
+function groups(){const m=new Map(),get=k=>m.get(k)||(m.set(k,{key:k,run:[],saved:[],all:[],last:0}),m.get(k));
+  for(const x of S){const g=get(pkey(x));g.last=Math.max(g.last,x.mtime);if(x.status)g.run.push(x);else g.all.push(x)}
+  for(const x of savedFiltered())get(pkey(x)).saved.push(x);
+  for(const g of m.values())g.run.sort((a,b)=>!!b.waiting-!!a.waiting);
+  let G=[...m.values()];if(words().length)G=G.filter(g=>g.saved.length);
+  for(const g of m.values())g.lastSaved=Math.max(0,...g.all.map(x=>x.mtime));
+  return G.sort((a,b)=>!a.run.length-!b.run.length||(a.run.length?pname(a.key).localeCompare(pname(b.key)):b.lastSaved-a.lastSaved))}
+/* saved chats in the order they're on screen, for j/k */
+function visibleSaved(){return mode()==="list"?savedFiltered():groups().filter(g=>!collapsed.has(g.key)).flatMap(g=>g.saved)}
+const where=(x,inProject)=>inProject?(x.cwd&&x.cwd!==x.project?esc(x.cwd)+" · ":""):esc(x.cwd||"–")+" · ";
+function runCard(x,inProject){return `<div class="card${x.waiting?" waiting":""}"><div class="row"><span class="dot ${x.waiting?"wait":x.status==="busy"?"busy":""}"></span><span class="name" title="${esc(x.name)}">${esc(x.name)}</span><button class="btn" data-ren="${x.sid}" title="Rename">Rename</button><button class="btn" data-orun="${x.sid}">Open</button><button class="btn danger" data-stop="${x.sid}">Stop</button></div>
+   ${x.waiting?`<div class="badge" title="${esc(x.waiting)}">Waiting for you</div> <span class="meta">${esc(x.waiting)}</span>`:""}
+   <div class="meta">${where(x,inProject)}${x.waiting?"needs you":x.status==="busy"?"working":"idle"} · ${esc(x.kind||"")} · ${x.msgs} msgs${x.cost?" · "+usd(x.cost):""}</div>
+   <div class="bar"><i style="width:${Math.min(100,x.ctx/1e4)}%;background:${col[cls(x.ctx)]}"></i></div>
+   <div class="row" style="margin-top:3px"><span class="meta" style="flex:1;margin:0"><b class="${cls(x.ctx)}">${k(x.ctx)} tokens</b>${x.ctx>=400e3?' · <span class="bad">expensive – every message re-sends all of this</span>':x.ctx>=150e3?' · getting big':''}</span>
+   ${x.ctx>=150e3?`<button class="btn ${x.ctx>=400e3?"danger":""}" data-compact="${x.sid}" title="Run /compact in the chat: Claude summarises the conversation so far, so each message costs less">Compact</button>`:""}</div></div>`}
+function savedRow(x,inProject){const snip=hits[x.sid];return `<div class="saved${cur===x.sid?" cur":""}" data-row="${x.sid}"><input type="checkbox" data-sel="${x.sid}" ${sel.has(x.sid)?"checked":""}>
+   <div class="txt" data-view="${x.sid}"><div class="name" title="${esc(x.name)}">${hl(x.name)}</div><div class="meta">${where(x,inProject)}${x.msgs} msgs · ${mb(x.size)}${x.cost?" · "+usd(x.cost):""} · ${ago(x.mtime)}</div>
+   ${snip?`<div class="snip">${hl(snip)}</div>`:""}</div>
+   <button class="btn" data-ren="${x.sid}" title="Give this chat a name you'll recognise (e)">Rename</button><button class="btn" data-open="${x.sid}">Resume</button><button class="btn danger" data-del="${x.sid}">Delete</button></div>`}
+function cleanupSets(){const s=S.filter(x=>!x.status),old=d=>s.filter(x=>now-x.mtime>d*86400);
+  return [["empty","Empty chats",s.filter(x=>!x.msgs)],["7","Older than 7 days",old(7)],["30","Older than 30 days",old(30)],["90","Older than 90 days",old(90)]]}
+function render(){
+  const run=running(),all=S.filter(x=>!x.status),nw=run.filter(x=>x.waiting).length,M=mode();
+  $("nWait").innerHTML=nw?`<span class="w">${nw} waiting for you</span> · `:"";
+  $("nRun").textContent=run.length;$("nSaved").textContent=all.length;$("disk").textContent=mb(all.reduce((a,x)=>a+x.size,0));$("tok").textContent=k(run.reduce((a,x)=>a+x.ctx,0));
+  document.querySelectorAll(".seg button").forEach(b=>b.classList.toggle("on",b.dataset.mode===M));
+  const cs=cleanupSets();$("cleanup").innerHTML=`<option value="">Clean up…</option>`+cs.map(([v,l,L])=>`<option value="${v}" ${L.length?"":"disabled"}>${l} (${L.length}${L.length?", "+mb(L.reduce((a,x)=>a+x.size,0)):""})</option>`).join("");
+  for(const s of [...sel]) if(!all.some(x=>x.sid===s)) sel.delete(s);
+  if(cur&&!visibleSaved().some(x=>x.sid===cur))cur=null;
+  $("delSel").style.display=sel.size?"":"none";$("delSel").textContent=`Delete ${sel.size} selected`;
+  const q=words().length,noMatch=`<div class="empty">No saved chats match “${esc($("q").value.trim())}”.</div>`;let html="";
+  if(!S.length)html=`<div class="welcome"><b>Nothing here yet.</b><br>Start Claude Code in any folder with <code>claude</code>. Running chats show up here within a few seconds, and finished ones are kept so you can read, search, resume or clean them up.</div>`;
+  else if(M==="list"){const saved=savedFiltered();
+    html=`<div class="sub">Running now</div>`+(run.length?run.map(x=>runCard(x,false)).join(""):'<div class="empty">No Claude sessions running.</div>')
+     +`<div class="sub">Saved</div>`+(saved.length?saved.map(x=>savedRow(x,false)).join(""):q?noMatch:'<div class="empty">No saved chats.</div>')}
+  else{const G=groups();html=G.length?G.map(g=>{const w=g.run.filter(x=>x.waiting).length,closed=collapsed.has(g.key);
+      return `<div class="psec${closed?" closed":""}"><div class="phead" data-ptoggle="${esc(g.key)}" title="${closed?"Show":"Hide"} this project's chats">
+       <span class="caret">▾</span><span class="pn">${esc(pname(g.key))}</span><span class="pp">${esc(g.key)}</span>
+       <span class="pc">${w?`<span class="w">${w} waiting</span> · `:""}${g.run.length?`<span class="r">${g.run.length} running</span> · `:""}${g.all.length} saved${g.all.length?" · "+mb(g.all.reduce((a,x)=>a+x.size,0)):""}</span></div>
+       <div class="pbody">${g.run.map(x=>runCard(x,true)).join("")}${g.saved.map(x=>savedRow(x,true)).join("")}${!g.run.length&&!g.saved.length?'<div class="empty">No chats.</div>':""}</div></div>`}).join(""):noMatch}
+  $("list").innerHTML=html;
+}
+let lastSig="",lastDraw=0,pressing=false,hovering=false,heldSince=0,held=null;
+const HOT="button,select,input,.txt,.phead";
+document.addEventListener("mousedown",()=>pressing=true,true);
+window.addEventListener("mouseup",()=>setTimeout(()=>{pressing=false;flush()},300),true);window.addEventListener("blur",()=>{pressing=false;flush()});
+document.addEventListener("mouseover",e=>{hovering=!!e.target.closest(HOT);if(!hovering)flush()});
+document.documentElement.addEventListener("mouseleave",()=>{hovering=false;flush()});
+/* a redraw that arrived while the mouse was on a control; drawn when it moves off, or after 8s at most */
+function flush(){if(held&&!pressing){const d=held;held=null;draw(d)}}
+function draw(d){S=d.chats;now=d.now;lastDraw=Date.now();render();renderUsage(d.usage)}
+let inflight=false;
+async function refresh(force){if(inflight&&!force)return;inflight=true;try{const d=await getJ("/api/state");$("off").style.display="none";
+  const ws=new Set(d.chats.filter(x=>x.waiting).map(x=>x.sid));if(!first&&[...ws].some(s=>!waitSeen.has(s)))beep();waitSeen=ws;first=false;
+  const sig=JSON.stringify([d.chats.map(x=>[x.sid,x.name,x.status,x.ctx,x.msgs,x.size,x.cost,x.waiting]),d.usage]);
+  const stale=Date.now()-lastDraw>60000;  // refresh the "x min ago" labels once a minute
+  if(force||sig!==lastSig||stale){lastSig=sig;
+    if(!force&&(editing||(pressing||hovering)&&(!held||Date.now()-heldSince<8000))){if(!held)heldSince=Date.now();held=d}else{held=null;draw(d)}}
+ }catch(e){$("off").style.display="block";
+   if(e.message==="404"||e.message==="403")setTimeout(()=>location.reload(),1500)  // server restarted with a new token
+ }finally{inflight=false}}
+let searchT,searchN=0;
+function onSearch(){render();clearTimeout(searchT);const q=$("q").value.trim();if(q.length<2){hits={};render();return}
+  searchT=setTimeout(async()=>{const n=++searchN;try{const h=await getJ("/api/search?q="+encodeURIComponent(q));if(n===searchN){hits=h;render()}}catch{}},220)}
+
+/* actions */
+async function del(sids){if(!sids.length)return false;if(!confirm(`Delete ${sids.length} saved chat${sids.length>1?"s":""} permanently?`))return false;
+  const r=await getJ("/api/delete",{sids});sids.forEach(s=>sel.delete(s));toast(`Deleted ${r.deleted.length}`+(r.refused.length?` · ${r.refused.length} skipped (running)`:""));refresh(true);return true}
+/* when no terminal could be opened, hand over the command to paste instead */
+async function opened(r,msg){if(r.ok)return toast(msg);if(r.copy){try{await navigator.clipboard.writeText(r.copy);toast("Couldn't open a terminal – command copied, paste it into one")}catch{prompt("Run this in a terminal:",r.copy)}}else toast("Couldn't open: "+(r.error||"unknown error"))}
+async function resume(sid){await opened(await getJ("/api/open",{sid}),"Opening in a new terminal tab…")}
+
+/* viewer */
+function fmt(s){const parts=String(s).split(/```[^\n]*\n?/);return parts.map((p,i)=>i%2?`<pre>${esc(p.replace(/\n$/,""))}</pre>`:
+  hl(p).replace(/`([^`\n]+)`/g,"<code>$1</code>").replace(/\*\*([^*\n]+)\*\*/g,"<b>$1</b>")).join("")}
+async function openViewer(sid){let d;try{d=await getJ("/api/chat?sid="+sid)}catch(e){return toast("Couldn't open that chat")}
+  V=d;$("viewer").classList.add("on");$("vTitle").textContent=d.name;$("vTitle").title=d.name;
+  $("vMeta").textContent=`${d.cwd||"–"} · ${mb(d.size)}${d.cost?" · "+usd(d.cost):""} · ${ago(d.mtime)}${d.running?" · running":""}`;
+  $("vDel").disabled=d.running;
+  let h=d.hidden?`<div class="sep">${d.hidden} earlier items not shown – export to see everything</div>`:"";
+  for(const it of d.items){
+    if(it.k==="user")h+=`<div class="m you"><div class="who">You</div>${fmt(it.text)}</div>`;
+    else if(it.k==="assistant")h+=`<div class="m ai"><div class="who">Claude</div>${fmt(it.text)}</div>`;
+    else if(it.k==="tool")h+=`<div class="t" title="${esc(it.text)}">▸ <b>${esc(it.name)}</b> ${esc(it.text)}</div>`;
+    else if(it.k==="result"){const n=it.text.split("\n").length;h+=`<details class="r${it.err?" err":""}"><summary>${it.err?"error":"output"} · ${n} line${n>1?"s":""}${it.cut?" (cut)":""}</summary><pre>${esc(it.text)}</pre></details>`}
+    else if(it.k==="command")h+=`<div class="t">▸ <b>${esc(it.text)}</b></div>`;
+    else if(it.k==="compact")h+=`<div class="sep">conversation compacted – earlier context was summarised</div>`}
+  $("vBody").innerHTML=h||'<div class="empty">This chat has no messages.</div>';
+  const m=$("vBody").querySelector("mark");if(m)m.scrollIntoView({block:"center"});else $("vBody").scrollTop=$("vBody").scrollHeight}
+function closeViewer(){$("viewer").classList.remove("on");V=null}
+/* rename in place: the name turns into a text box; Enter saves, Esc cancels. A running chat shows its new
+   name here straight away and gets it for good when it ends (Claude Code keeps its own name until then). */
+let editing=false;
+function editName(sid,el){const x=S.find(y=>y.sid===sid)||(V&&V.sid===sid?{name:V.name,status:V.running}:null);if(!x||!el)return;
+  const i=document.createElement("input");i.className="ren";i.value=x.name==="(empty)"?"":x.name;i.placeholder="Name this chat";i.maxLength=80;
+  el.replaceWith(i);i.focus();i.select();editing=true;
+  let done=false;const finish=async save=>{if(done)return;done=true;editing=false;const title=i.value.trim();i.replaceWith(el);
+    if(save&&title&&title!==x.name){const r=await getJ("/api/rename",{sid,title});
+      if(r.ok){el.textContent=r.title;if(V&&V.sid===sid)V.name=r.title;
+        toast(r.typed?"Renamed – ran /rename in the chat for you":r.pending?(r.busy?"Renamed here – the chat is busy, so Claude Code gets the name when it ends":
+          "Renamed here only – couldn't find its terminal tab (tabs with a locked title can't be found). Type /rename in it, or it gets the name when it ends"):"Renamed",r.pending?7000:2500)}
+      else toast("Couldn't rename: "+r.error)}
+    refresh(true)};
+  i.addEventListener("keydown",e=>{e.stopPropagation();if(e.key==="Enter")finish(true);if(e.key==="Escape")finish(false)});i.addEventListener("blur",()=>finish(true))}
+function startRename(){if(V)editName(V.sid,$("vTitle"))}
+async function exportMd(sid,name){const b=await(await api("/api/export?sid="+sid)).blob();const a=document.createElement("a");a.href=URL.createObjectURL(b);
+  a.download=(name||"chat").replace(/[^\w\- ]+/g,"-").slice(0,60)+".md";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000);toast("Exported")}
+
+document.addEventListener("click",async e=>{if(e.target.classList.contains("ren"))return;const t=e.target.closest("button")||e.target,d=t.dataset;
+  if(t.tagName==="BUTTON"){if(t.classList.contains("busy"))return;t.classList.add("busy")}try{
+  if(d.stop){const x=S.find(s=>s.sid===d.stop);if(confirm(`Stop "${x?x.name:"this session"}"? Unsaved work in progress will be interrupted.`)){const r=await getJ("/api/stop",{sid:d.stop});toast(r.ok?"Stopped":"Couldn't stop: "+r.error);setTimeout(()=>refresh(true),1500)}}
+  else if(d.orun){toast("Finding its terminal…",15000);const r=await getJ("/api/open-running",{sid:d.orun});await opened(r,"Opened – "+r.how)}
+  else if(d.mode){store.set("mode",d.mode);cur=null;render()}
+  else if(t.closest("[data-ptoggle]")){const g=t.closest("[data-ptoggle]").dataset.ptoggle;collapsed.has(g)?collapsed.delete(g):collapsed.add(g);store.set("collapsed",JSON.stringify([...collapsed]));render()}
+  else if(d.open){await resume(d.open)}
+  else if(d.del){await del([d.del])}
+  else if(t.closest("[data-view]")){const sid=t.closest("[data-view]").dataset.view;cur=sid;openViewer(sid)}
+  else if(t.id==="delSel"){await del([...sel])}
+  else if(t.id==="viewBtn"){await opened(await getJ("/api/open",{view:true}),"Opening agents view…")}
+  else if(t.id==="themeBtn"){store.set("theme",themes[(themes.indexOf(store.get("theme","auto"))+1)%3]);applyTheme()}
+  else if(t.id==="soundBtn"){const on=store.get("sound","on")==="on";store.set("sound",on?"off":"on");applySound();if(!on)beep()}
+  else if(t.id==="helpBtn"){$("help").classList.toggle("on")}
+  else if(t.id==="vBack"){closeViewer()}
+  else if(t.id==="vRen"){startRename()}
+  else if(d.compact){const x=S.find(s=>s.sid===d.compact);
+    if(confirm(`Compact "${x?x.name:"this chat"}"?\n\nClaude Code summarises the conversation so far and carries on from the summary, so each new message costs much less. Details from earlier may be summarised away.`)){
+      toast("Running /compact in the chat…",15000);const r=await getJ("/api/compact",{sid:d.compact});toast(r.ok?"Compacting – it'll shrink once Claude finishes the summary":"Couldn't compact: "+r.error,4000)}}
+  else if(d.ren){const row=document.querySelector(`[data-row="${d.ren}"] .name`)||t.closest(".card")?.querySelector(".name");editName(d.ren,row)}
+  else if(t.id==="vResume"&&V){await resume(V.sid)}
+  else if(t.id==="vExport"&&V){await exportMd(V.sid,V.name)}
+  else if(t.id==="vDel"&&V){if(await del([V.sid]))closeViewer()}
+  if(t.id!=="helpBtn")$("help").classList.remove("on");
+}catch(err){toast("Something went wrong: "+err.message)}finally{t.classList.remove("busy")}});
+document.addEventListener("change",async e=>{const t=e.target,s=t.dataset.sel;
+  if(s){t.checked?sel.add(s):sel.delete(s);render()}
+  else if(t.id==="sort"){store.set("sort",t.value);render()}
+  else if(t.id==="vTools"){$("viewer").classList.toggle("notools",!t.checked)}
+  else if(t.id==="cleanup"){const hit=cleanupSets().find(c=>c[0]===t.value);t.value="";if(hit)try{await del(hit[2].map(x=>x.sid))}catch(err){toast("Something went wrong: "+err.message)}}});
+document.addEventListener("keydown",async e=>{const typing=/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)&&document.activeElement.type!=="checkbox";
+  if(e.key==="Escape"){if($("help").classList.contains("on"))$("help").classList.remove("on");else if(V)closeViewer();else if(typing){$("q").value="";onSearch();document.activeElement.blur()}return}
+  if(typing||e.ctrlKey||e.metaKey||e.altKey)return;
+  try{
+  if(e.key==="/"){e.preventDefault();if(V)closeViewer();$("q").focus();return}
+  if(e.key==="?"){$("help").classList.toggle("on");return}
+  if(V){if(e.key==="e"){e.preventDefault();startRename()}else if(e.key==="r")await resume(V.sid);return}
+  const L=visibleSaved(),i=L.findIndex(x=>x.sid===cur);
+  if(e.key==="j"||e.key==="ArrowDown"){e.preventDefault();cur=(L[Math.min(L.length-1,i+1)]||{}).sid||null}
+  else if(e.key==="k"||e.key==="ArrowUp"){e.preventDefault();cur=(L[Math.max(0,i-1)]||{}).sid||null}
+  else if(!cur)return;
+  else if(e.key==="Enter"||e.key==="o"){openViewer(cur);return}
+  else if(e.key==="r"){await resume(cur);return}
+  else if(e.key==="e"){e.preventDefault();editName(cur,document.querySelector(`[data-row="${cur}"] .name`));return}
+  else if(e.key==="x"){sel.has(cur)?sel.delete(cur):sel.add(cur)}
+  else if(e.key==="Delete"||e.key==="d"){const nx=L[i+1]||L[i-1];if(await del([cur]))cur=nx?nx.sid:null}
+  else return;
+  render();const r=document.querySelector(`[data-row="${cur}"]`);if(r)r.scrollIntoView({block:"nearest"})}catch(err){toast("Something went wrong: "+err.message)}});
+$("q").addEventListener("input",onSearch);
+$("sort").value=store.get("sort","recent");applyTheme();applySound();
+refresh(true);setInterval(refresh,4000);
+</script></body></html>

@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=77"]   # for license = "MIT" and license-files
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chatdeck"
+dynamic = ["version"]
+description = "A local dashboard for your Claude Code chats: what's running, what needs you, and what it costs."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.9"
+dependencies = []
+keywords = ["claude", "claude-code", "dashboard", "ai", "cli"]
+classifiers = [
+  "Environment :: Console",
+  "Environment :: Web Environment",
+  "Operating System :: MacOS",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+]
+
+[project.urls]
+Homepage = "https://github.com/Abdifatah09/chatdeck"
+Issues = "https://github.com/Abdifatah09/chatdeck/issues"
+
+[project.scripts]
+chatdeck = "chatdeck.cli:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "chatdeck.__version__" }
+
+[tool.setuptools.package-data]
+chatdeck = ["static/*", "windows/*"]

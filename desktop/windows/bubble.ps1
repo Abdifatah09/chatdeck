@@ -42,7 +42,7 @@ public static class U {
 [System.Net.WebRequest]::DefaultWebProxy = $null   # skip proxy detection, which adds seconds per request
 
 $Base = "http://127.0.0.1:$Port"
-$PopupTitle = "chatdeck popup"
+$PopupTitle = "chatdeck" + [char]0x200B   # reads "chatdeck"; the zero-width space tells the pop-up apart from the full window
 $Size = 64
 $StateFile = Join-Path $env:APPDATA "chatdeck\bubble.json"
 $script:token = $null
@@ -61,6 +61,32 @@ function Get-Summary {
   catch { $script:token = $null; throw }   # the server may have restarted with a new token
 }
 
+# --- the logo: the same shapes as assets/logo.svg (a deck of chat cards) -----------------------
+$LogoXaml = @'
+<Canvas xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" Width="64" Height="64">
+  <Rectangle Canvas.Left="23" Canvas.Top="5" Width="36" Height="28" RadiusX="7" RadiusY="7" Fill="#A9C4F7"/>
+  <Rectangle Canvas.Left="14" Canvas.Top="12" Width="38" Height="29" RadiusX="7" RadiusY="7" Fill="#6E9BEE"/>
+  <Path Data="M13 20h34a8 8 0 0 1 8 8v16a8 8 0 0 1-8 8H24l-11 9 2-9h-2a8 8 0 0 1-8-8V28a8 8 0 0 1 8-8z">
+    <Path.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="1,1"><GradientStop Offset="0" Color="#4C86F0"/><GradientStop Offset="1" Color="#2A5BD7"/></LinearGradientBrush></Path.Fill>
+  </Path>
+  <Rectangle Canvas.Left="14" Canvas.Top="30" Width="26" Height="4.5" RadiusX="2.25" RadiusY="2.25" Fill="White"/>
+  <Rectangle Canvas.Left="14" Canvas.Top="38.5" Width="17" Height="4.5" RadiusX="2.25" RadiusY="2.25" Fill="White" Opacity="0.8"/>
+</Canvas>
+'@
+
+function Logo-Bitmap($px) {
+  # The logo rendered to a System.Drawing bitmap, for the tray icon.
+  $vb = New-Object System.Windows.Controls.Viewbox
+  $vb.Child = [Windows.Markup.XamlReader]::Parse($LogoXaml)
+  $vb.Measure((New-Object System.Windows.Size($px, $px))); $vb.Arrange((New-Object System.Windows.Rect(0, 0, $px, $px)))
+  $rtb = New-Object System.Windows.Media.Imaging.RenderTargetBitmap($px, $px, 96, 96, [System.Windows.Media.PixelFormats]::Pbgra32)
+  $rtb.Render($vb)
+  $enc = New-Object System.Windows.Media.Imaging.PngBitmapEncoder
+  $enc.Frames.Add([System.Windows.Media.Imaging.BitmapFrame]::Create($rtb))
+  $ms = New-Object System.IO.MemoryStream; $enc.Save($ms); $ms.Position = 0
+  New-Object System.Drawing.Bitmap($ms)
+}
+
 # --- the bubble ------------------------------------------------------------------------------
 [xml]$xaml = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -72,8 +98,7 @@ function Get-Summary {
     <Ellipse x:Name="Disc" Width="48" Height="48" Fill="#1B1F27" Stroke="#3A4150" StrokeThickness="1">
       <Ellipse.Effect><DropShadowEffect BlurRadius="10" ShadowDepth="2" Opacity="0.45"/></Ellipse.Effect>
     </Ellipse>
-    <TextBlock x:Name="Glyph" FontSize="24" Foreground="#E6E8EE" HorizontalAlignment="Center" VerticalAlignment="Center"
-               FontFamily="Segoe UI Symbol" Margin="0,0,0,2"/>
+    <Viewbox Width="30" Height="30" Margin="0,1,0,0">$LogoXaml</Viewbox>
     <Border x:Name="Badge" Background="#3ECF8E" CornerRadius="9" MinWidth="18" Height="18" HorizontalAlignment="Right"
             VerticalAlignment="Top" Margin="0,5,5,0" Padding="4,0" Visibility="Collapsed">
       <TextBlock x:Name="Count" Foreground="#0F1115" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/>
@@ -82,9 +107,8 @@ function Get-Summary {
 </Window>
 "@
 $win = [Windows.Markup.XamlReader]::Load((New-Object System.Xml.XmlNodeReader $xaml))
-$ring = $win.FindName("Ring"); $disc = $win.FindName("Disc"); $glyph = $win.FindName("Glyph")
+$ring = $win.FindName("Ring"); $disc = $win.FindName("Disc")
 $badge = $win.FindName("Badge"); $count = $win.FindName("Count")
-$glyph.Text = [string][char]0x2733
 $win.ToolTip = "chatdeck"
 
 $pulse = New-Object System.Windows.Media.Animation.DoubleAnimation(0.25, 1, [TimeSpan]::FromMilliseconds(700))
@@ -195,19 +219,17 @@ Add-TrayItem "Quit" { $win.Close() } | Out-Null
 $trayMenu.Add_Opening({ $bubbleItem.Text = $(if ($script:hiddenUntil) { "Show the corner button" } else { "Hide the corner button" }) })
 $tray.ContextMenuStrip = $trayMenu
 
-# The tray icon is drawn here: the same asterisk, with a count badge in its corner.
+# The tray icon: the logo, with a count badge in its corner.
 $script:trayKey = $null; $script:trayIcon = $null; $script:trayHandle = [IntPtr]::Zero
 function Set-Tray($label, $argb, $tip) {
   $key = "$label|$argb"
   if ($key -ne $script:trayKey) {
-    $bmp = New-Object System.Drawing.Bitmap 32, 32
+    $bmp = Logo-Bitmap 32
     $g = [System.Drawing.Graphics]::FromImage($bmp)
     $g.SmoothingMode = "AntiAlias"; $g.TextRenderingHint = "AntiAliasGridFit"
     $center = New-Object System.Drawing.StringFormat; $center.Alignment = "Center"; $center.LineAlignment = "Center"
-    $g.FillEllipse((New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(255, 27, 31, 39))), 0, 0, 31, 31)
-    $glyphFont = New-Object System.Drawing.Font("Segoe UI Symbol", 17, [System.Drawing.FontStyle]::Bold, [System.Drawing.GraphicsUnit]::Pixel)
-    $g.DrawString([string][char]0x2733, $glyphFont, [System.Drawing.Brushes]::WhiteSmoke, (New-Object System.Drawing.RectangleF(0, 0, 32, 31)), $center)
     if ($label) {
+      $g.FillEllipse((New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(255, 15, 17, 21))), 11, 11, 23, 23)   # dark ring keeps it apart from the logo
       $g.FillEllipse((New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb($argb))), 13, 13, 19, 19)
       $badgeFont = New-Object System.Drawing.Font("Segoe UI", 13, [System.Drawing.FontStyle]::Bold, [System.Drawing.GraphicsUnit]::Pixel)
       $g.DrawString($label, $badgeFont, (New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(255, 15, 17, 21))),

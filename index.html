@@ -1,5 +1,6 @@
 <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>chatdeck</title>
+<link rel="icon" href="/logo.svg" type="image/svg+xml"><link rel="icon" href="/logo-192.png" sizes="192x192"><link rel="manifest" href="/manifest.webmanifest">
 <style>
 :root{--bg:#0f1115;--panel:#171a21;--panel2:#1a1e26;--line:#262a33;--line2:#3a4150;--text:#e6e8ee;--dim:#8b92a1;--green:#3ecf8e;--amber:#f5b942;--red:#f06a6a;
  --btn:#222733;--input:#14171d;--bar:#232733;--chart:#4a7fd4;--chart2:#7fb0ff;--toast:#24406b;--toasttext:#e6e8ee;--offbg:#3a1d1d;--offtext:#ffb4b4;
@@ -81,7 +82,7 @@ details.r pre{background:var(--code);border-radius:6px;padding:6px 8px;overflow:
 #help{position:fixed;inset:auto 12px 50px 12px;background:var(--panel);border:1px solid var(--line2);border-radius:9px;padding:10px 12px;display:none;z-index:30;font-size:12px;box-shadow:0 6px 24px rgba(0,0,0,.3)}
 #help.on{display:block}#help div{display:flex;justify-content:space-between;padding:2px 0}#help kbd{font:11px Consolas,ui-monospace,monospace;background:var(--code);border:1px solid var(--line);border-radius:4px;padding:0 5px}
 </style></head><body>
-<header><div class="top"><h1>chatdeck</h1>
+<header><div class="top"><img src="/logo.svg" alt="" width="20" height="20" style="flex:none"><h1>chatdeck</h1>
  <button class="btn icon" id="soundBtn" title="Sound when a chat needs you"></button>
  <button class="btn icon" id="themeBtn" title="Theme"></button>
  <button class="btn icon" id="helpBtn" title="Keyboard shortcuts (?)">?</button>
@@ -106,7 +107,7 @@ details.r pre{background:var(--code);border-radius:6px;padding:6px 8px;overflow:
  <div><span>Delete</span><kbd>Del</kbd></div><div><span>Rename (in a chat)</span><kbd>e</kbd></div><div><span>Back / clear search</span><kbd>Esc</kbd></div></div>
 <div id="toast"></div>
 <script>
-const TOKEN="__TOKEN__";if(new URLSearchParams(location.search).has("popup"))document.title="chatdeck popup";  // the desktop bubble finds its pop-up by this title
+const TOKEN="__TOKEN__";if(new URLSearchParams(location.search).has("popup"))document.title="chatdeck\u200b";  // reads "chatdeck"; the zero-width space lets the desktop bubble tell its pop-up from the full window
 const $=id=>document.getElementById(id);let S=[],sel=new Set(),now=Date.now()/1000,hits={},cur=null,V=null,first=true,waitSeen=new Set();
 const store={get(k,d){try{return localStorage.getItem(k)??d}catch{return d}},set(k,v){try{localStorage.setItem(k,v)}catch{}}};
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));

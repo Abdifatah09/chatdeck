@@ -18,6 +18,14 @@ STATUS, WAITING = os.path.join(DATA, "status"), os.path.join(DATA, "waiting")
 PORT = int(os.environ.get("CHATDECK_PORT") or 47123)
 TOKEN = secrets.token_hex(16)
 PAGE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "index.html")
+ASSETS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
+STATIC = {"/logo.svg": ("logo.svg", "image/svg+xml"), "/logo-192.png": ("logo-192.png", "image/png"),
+          "/logo-512.png": ("logo-512.png", "image/png")}
+MANIFEST = {"name": "chatdeck", "short_name": "chatdeck", "display": "standalone", "background_color": "#0f1115",
+            "theme_color": "#0f1115", "start_url": "/",
+            "icons": [{"src": "/logo-192.png", "sizes": "192x192", "type": "image/png"},
+                      {"src": "/logo-512.png", "sizes": "512x512", "type": "image/png"},
+                      {"src": "/logo.svg", "sizes": "any", "type": "image/svg+xml"}]}
 INDEX = transcripts.Index(PROJECTS)
 LIMITS = usage.LimitHistory(os.path.join(DATA, "limits-history.jsonl"))
 
@@ -181,6 +189,12 @@ class H(BaseHTTPRequestHandler):
         if u.path == "/":
             with open(PAGE) as f:
                 return self.send(200, f.read().replace("__TOKEN__", TOKEN).encode(), "text/html; charset=utf-8")
+        if u.path in STATIC:   # the logo and app manifest are public; they give nothing away
+            name, ctype = STATIC[u.path]
+            with open(os.path.join(ASSETS, name), "rb") as f:
+                return self.send(200, f.read(), ctype)
+        if u.path == "/manifest.webmanifest":
+            return self.send(200, json.dumps(MANIFEST).encode(), "application/manifest+json")
         if not self.authed(): return self.send(404, {"error": "not found"})
         if u.path == "/api/state": return self.send(200, state())
         if u.path == "/api/summary":   # small payload for the desktop bubble's badge

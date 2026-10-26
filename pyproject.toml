@@ -20,6 +20,10 @@ classifiers = [
   "Programming Language :: Python :: 3",
 ]
 
+[project.urls]
+Homepage = "https://github.com/Abdifatah09/chatdeck"
+Issues = "https://github.com/Abdifatah09/chatdeck/issues"
+
 [project.scripts]
 chatdeck = "chatdeck.cli:main"
 

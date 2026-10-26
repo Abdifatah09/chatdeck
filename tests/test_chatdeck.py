@@ -277,6 +277,18 @@ class RenameRunningTest(Tmp):
             running[SID]["status"] = "idle"
             self.assertTrue(server.compact(SID)["ok"]); self.assertEqual(typed, ["/compact"])
 
+    def test_auto_rename_types_bare_rename_only_when_idle(self):
+        from chatdeck import server
+        self.write(user("x"))
+        running, typed = {SID: {"name": "auto", "status": "busy", "kind": "interactive", "pid": 1}}, []
+        with unittest.mock.patch.object(server, "INDEX", transcripts.Index(self.dir)), unittest.mock.patch.object(server, "PROJECTS", self.dir), \
+             unittest.mock.patch.object(server, "agents", lambda fresh=False: running), \
+             unittest.mock.patch.object(server.terminals, "type_into", lambda pid, name, text: typed.append(text) or True):
+            self.assertFalse(server.auto_rename(SID)["ok"]); self.assertEqual(typed, [])
+            running[SID]["status"] = "idle"
+            self.assertTrue(server.auto_rename(SID)["ok"]); self.assertEqual(typed, ["/rename"])
+            self.assertIn("isn't running", server.auto_rename("00000000-0000-0000-0000-000000000000")["error"])
+
 
 class NewChatTest(Tmp):
     def test_opens_only_known_project_folders(self):

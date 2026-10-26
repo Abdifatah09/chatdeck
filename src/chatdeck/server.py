@@ -197,6 +197,17 @@ def _demo_rename(sid, title):
     _fetch_agents()
     return {"ok": True, "title": title, "typed": True}
 
+def auto_rename(sid):
+    """Run Claude Code's /rename with no name in a running chat: Claude names it after what it's about."""
+    act = agents(fresh=True); a = act.get(sid)
+    if not a: return {"ok": False, "error": "it isn't running - open it and type /rename, or type a name for it here"}
+    if a.get("status") != "idle" or sid in waiting(act, INDEX.all()):
+        return {"ok": False, "error": "it's busy - try again when it's waiting for your next message"}
+    if config.DEMO: return DEMO_OFF
+    if a.get("kind") != "interactive" or not a.get("pid") or not terminals.type_into(int(a["pid"]), a.get("name"), "/rename"):
+        return {"ok": False, "error": "couldn't find its terminal tab (tabs with a locked title can't be found) - type /rename in it"}
+    return {"ok": True}
+
 def rename(sid, title):
     title = " ".join(str(title or "").split())[:80]
     p = transcript(sid)
@@ -310,7 +321,9 @@ class H(BaseHTTPRequestHandler):
         n = int(self.headers.get("Content-Length") or 0)
         body = json.loads(self.rfile.read(n) or b"{}")
         if self.path == "/api/delete": return self.send(200, delete(body.get("sids", [])))
-        if self.path == "/api/rename": return self.send(200, rename(body.get("sid", ""), body.get("title", "")))
+        if self.path == "/api/rename":
+            if body.get("auto"): return self.send(200, auto_rename(body.get("sid", "")))
+            return self.send(200, rename(body.get("sid", ""), body.get("title", "")))
         if self.path == "/api/stop": return self.send(200, stop(body.get("sid", "")))
         if self.path == "/api/compact": return self.send(200, compact(body.get("sid", "")))
         if self.path == "/api/open": return self.send(200, open_chat(body.get("sid", ""), body.get("view", False)))

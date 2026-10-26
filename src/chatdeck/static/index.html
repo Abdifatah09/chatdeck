@@ -184,7 +184,7 @@ function groups(){const m=new Map(),get=k=>m.get(k)||(m.set(k,{key:k,run:[],save
 /* saved chats in the order they're on screen, for j/k */
 function visibleSaved(){return mode()==="list"?savedFiltered():groups().filter(g=>!collapsed.has(g.key)).flatMap(g=>g.saved)}
 const where=(x,inProject)=>inProject?(x.cwd&&x.cwd!==x.project?esc(x.cwd)+" · ":""):esc(x.cwd||"–")+" · ";
-function runCard(x,inProject){return `<div class="card${x.waiting?" waiting":""}"><div class="row"><span class="dot ${x.waiting?"wait":x.status==="busy"?"busy":""}"></span><span class="name" title="${esc(x.name)}">${esc(x.name)}</span><button class="btn" data-ren="${x.sid}" title="Rename">Rename</button><button class="btn" data-orun="${x.sid}">Open</button><button class="btn danger" data-stop="${x.sid}">Stop</button></div>
+function runCard(x,inProject){return `<div class="card${x.waiting?" waiting":""}"><div class="row"><span class="dot ${x.waiting?"wait":x.status==="busy"?"busy":""}"></span><span class="name" data-sid="${x.sid}" title="${esc(x.name)} – double-click to type your own name">${esc(x.name)}</span><button class="btn" data-autoren="${x.sid}" title="Run /rename in the chat, so Claude names it after what it's about">Rename</button><button class="btn" data-orun="${x.sid}">Open</button><button class="btn danger" data-stop="${x.sid}">Stop</button></div>
    ${x.waiting?`<div class="badge" title="${esc(x.waiting)}">Waiting for you</div> <span class="meta">${esc(x.waiting)}</span>`:""}
    <div class="meta">${where(x,inProject)}${x.waiting?"needs you":x.status==="busy"?"working":"idle"} · ${esc(x.kind||"")} · ${x.msgs} msgs${x.cost?" · "+usd(x.cost):""}</div>
    <div class="bar"><i style="width:${Math.min(100,x.ctx/1e4)}%;background:${col[cls(x.ctx)]}"></i></div>
@@ -268,6 +268,7 @@ function closeViewer(){$("viewer").classList.remove("on");V=null}
 /* rename in place: the name turns into a text box; Enter saves, Esc cancels. A running chat shows its new
    name here straight away and gets it for good when it ends (Claude Code keeps its own name until then). */
 let editing=false;
+document.addEventListener("dblclick",e=>{const n=e.target.closest(".card .name[data-sid]");if(n)editName(n.dataset.sid,n)});
 function editName(sid,el){const x=S.find(y=>y.sid===sid)||(V&&V.sid===sid?{name:V.name,status:V.running}:null);if(!x||!el)return;
   const i=document.createElement("input");i.className="ren";i.value=x.name==="(empty)"?"":x.name;i.placeholder="Name this chat";i.maxLength=80;
   el.replaceWith(i);i.focus();i.select();editing=true;
@@ -303,6 +304,9 @@ document.addEventListener("click",async e=>{if(e.target.classList.contains("ren"
   else if(d.compact){const x=S.find(s=>s.sid===d.compact);
     if(confirm(`Compact "${x?x.name:"this chat"}"?\n\nClaude Code summarises the conversation so far and carries on from the summary, so each new message costs much less. Details from earlier may be summarised away.`)){
       toast("Running /compact in the chat…",15000);const r=await getJ("/api/compact",{sid:d.compact});toast(r.ok?"Compacting – it'll shrink once Claude finishes the summary":"Couldn't compact: "+r.error,4000)}}
+  else if(d.autoren){toast("Running /rename in the chat…",15000);const r=await getJ("/api/rename",{sid:d.autoren,auto:true});
+    toast(r.ok?"Claude is naming it after what it's about – the new name shows in a few seconds":"Couldn't rename: "+r.error,r.ok?4000:7000);
+    if(r.ok){setTimeout(()=>refresh(true),4000);setTimeout(()=>refresh(true),9000)}}
   else if(d.ren){const row=document.querySelector(`[data-row="${d.ren}"] .name`)||t.closest(".card")?.querySelector(".name");editName(d.ren,row)}
   else if(t.id==="vResume"&&V){await resume(V.sid)}
   else if(t.id==="vExport"&&V){await exportMd(V.sid,V.name)}

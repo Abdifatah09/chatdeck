@@ -32,7 +32,10 @@ _agents_lock = threading.Lock()
 def _fetch_agents():
     global _agents
     try:
-        out = subprocess.run(["claude", "agents", "--json"], capture_output=True, text=True, timeout=30).stdout
+        if config.DEMO:
+            with open(os.path.join(DATA, "demo-agents.json")) as f: out = f.read()
+        else:
+            out = subprocess.run(["claude", "agents", "--json"], capture_output=True, text=True, timeout=30).stdout
         res = {s["sessionId"]: s for s in json.loads(out or "[]") if s.get("sessionId")}
         with _agents_lock: _agents = (time.time(), res)
     except Exception:
@@ -128,13 +131,16 @@ def state():
                         "ctx": 0, "msgs": 0, "mtime": time.time(), "size": 0, "cost": 0, "status": a.get("status"),
                         "kind": a.get("kind"), "started": a.get("startedAt"), "waiting": wait.get(sid)})
     out.sort(key=lambda x: -x["mtime"])
-    return {"chats": out, "now": time.time(), "usage": usage.summary([e for _, e in chats.values()], STATUS, LIMITS)}
+    return {"chats": out, "now": time.time(), "usage": usage.summary([e for _, e in chats.values()], STATUS, LIMITS, project=project)}
 
 def manual(cwd, command):
     """What to paste into a terminal when no terminal could be opened for the person."""
     return f"cd {shlex.quote(cwd)} && {command}"
 
+DEMO_OFF = {"ok": False, "error": "this is the demo - it doesn't open terminals or touch real chats"}
+
 def open_running(sid):
+    if config.DEMO: return DEMO_OFF
     a = agents(fresh=True).get(sid)
     if not a: return {"ok": False, "error": "not running any more"}
     cwd = a.get("cwd") if os.path.isdir(a.get("cwd") or "") else HOME
@@ -165,6 +171,15 @@ def delete(sids):
         done.append(sid)
     return {"deleted": done, "refused": refused}
 
+def _demo_rename(sid, title):
+    path = os.path.join(DATA, "demo-agents.json")
+    with open(path) as f: running = json.load(f)
+    for x in running:
+        if x["sessionId"] == sid: x["name"] = title
+    with open(path, "w") as f: json.dump(running, f)
+    _fetch_agents()
+    return {"ok": True, "title": title, "typed": True}
+
 def rename(sid, title):
     title = " ".join(str(title or "").split())[:80]
     p = transcript(sid)
@@ -174,6 +189,7 @@ def rename(sid, title):
         a = act[sid]
         # Idle at its prompt in a terminal: run Claude Code's own /rename in it, so the name changes everywhere.
         idle = a.get("status") == "idle" and a.get("kind") == "interactive" and sid not in waiting(act, INDEX.all())
+        if config.DEMO: return _demo_rename(sid, title)
         if idle and a.get("pid") and terminals.type_into(int(a["pid"]), a.get("name"), f"/rename {title}"):
             return {"ok": True, "title": title, "typed": True}
         with _pending_lock:   # busy, waiting on you, or not in a terminal we can reach: see PENDING
@@ -188,11 +204,13 @@ def compact(sid):
     if not a: return {"ok": False, "error": "it isn't running"}
     if a.get("status") != "idle" or sid in waiting(act, INDEX.all()):
         return {"ok": False, "error": "it's busy - try again when it's waiting for your next message"}
+    if config.DEMO: return DEMO_OFF
     if a.get("kind") != "interactive" or not a.get("pid") or not terminals.type_into(int(a["pid"]), a.get("name"), "/compact"):
         return {"ok": False, "error": "couldn't reach its terminal - type /compact in it"}
     return {"ok": True}
 
 def stop(sid):
+    if config.DEMO: return DEMO_OFF
     a = agents(fresh=True).get(sid)
     if not a or not a.get("pid"): return {"ok": False, "error": "not running"}
     pid = int(a["pid"])
@@ -202,6 +220,7 @@ def stop(sid):
     return {"ok": True}
 
 def open_chat(sid, view=False):
+    if config.DEMO: return DEMO_OFF
     if view:
         inner = "claude agents"; cwd = HOME
     else:

@@ -267,5 +267,29 @@ class RenameRunningTest(Tmp):
             self.assertTrue(server.compact(SID)["ok"]); self.assertEqual(typed, ["/compact"])
 
 
+class CompactTest(Tmp):
+    def test_context_shrinks_at_the_compact_boundary(self):
+        self.write(user("hi") + assistant([{"type": "text", "text": "hello"}], usage_={"input_tokens": 385000, "output_tokens": 5}))
+        self.assertEqual(self.idx.get(self.path).ctx, 385000)
+        self.write(line(type="system", subtype="compact_boundary", compactMetadata={"preTokens": 385000, "postTokens": 17785}))
+        self.assertEqual(self.idx.get(self.path).ctx, 17785)
+
+
+class DemoTest(unittest.TestCase):
+    def test_demo_home_has_running_saved_waiting_and_limits(self):
+        from chatdeck import demo
+        root = tempfile.mkdtemp(); data = demo.build(root)
+        idx = transcripts.Index(os.path.join(root, ".claude", "projects"))
+        chats = idx.all()
+        with open(os.path.join(data, "demo-agents.json")) as f: running = json.load(f)
+        self.assertEqual(len(chats), len(demo.CHATS) + 1)   # plus one empty chat
+        self.assertEqual({a["sessionId"] for a in running} - set(chats), set())
+        self.assertEqual(len(os.listdir(os.path.join(data, "waiting"))), 1)
+        hist = usage.LimitHistory(os.path.join(data, "limits-history.jsonl"))
+        s = usage.summary([e for _, e in chats.values()], os.path.join(data, "status"), hist)
+        self.assertEqual(s["limits"]["data"]["five_hour"]["used_percentage"], 62)
+        self.assertIsNotNone(s["limits"]["forecast"]["five_hour"]["eta"])
+
+
 if __name__ == "__main__":
     unittest.main()

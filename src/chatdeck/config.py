@@ -7,6 +7,7 @@ DATA = os.environ.get("CHATDECK_DIR") or os.path.join(HOME, ".chatdeck")
 FILE = os.path.join(DATA, "config.json")
 DEFAULT_PORT = 47123
 CLAUDE_SETTINGS = os.path.join(HOME, ".claude", "settings.json")
+DEMO = bool(os.environ.get("CHATDECK_DEMO"))   # `chatdeck demo`: made-up chats, nothing outside them is touched
 
 
 def load():

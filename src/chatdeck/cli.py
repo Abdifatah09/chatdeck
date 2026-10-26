@@ -6,6 +6,7 @@
   chatdeck setup            add the Claude Code hooks for plan limits and "waiting for you"
   chatdeck autostart on|off start chatdeck at login, or stop doing that
   chatdeck uninstall        remove the hooks and autostart
+  chatdeck demo             try it with made-up chats (nothing real is read or changed)
   chatdeck bubble           Windows (WSL): start the corner button and tray icon
   chatdeck hook ...         used by Claude Code itself"""
 import argparse, os, signal, subprocess, sys, time, urllib.request
@@ -99,6 +100,27 @@ def cmd_bubble(a):
     desktop.start_bubble(a.port)
 
 
+def cmd_demo(a):
+    import shutil, tempfile
+    from . import demo, desktop
+    root = tempfile.mkdtemp(prefix="chatdeck-demo-")
+    try:
+        env = dict(os.environ, HOME=root, CHATDECK_DIR=demo.build(root), CHATDECK_DEMO="1",
+                   PYTHONPATH=os.pathsep.join(filter(None, [os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                                            os.environ.get("PYTHONPATH")])))
+        srv = subprocess.Popen([sys.executable, "-m", "chatdeck", "serve", "--port", str(a.port)], env=env)
+        url = f"http://127.0.0.1:{a.port}/"
+        for _ in range(40):
+            if _up(a.port) or srv.poll() is not None: break
+            time.sleep(0.25)
+        if not a.no_open and srv.poll() is None: desktop.open_dashboard(url)
+        srv.wait()
+    except KeyboardInterrupt:
+        srv.wait()
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
 def cmd_hook(a):
     if a.name == "statusline": hooks.statusline()
     elif a.name == "waiting": hooks.waiting()
@@ -118,6 +140,8 @@ def main(argv=None):
     s = sub.add_parser("autostart", help="start chatdeck at login: on, off or status")
     s.add_argument("state", choices=["on", "off", "status"]); port_arg(s)
     s.add_argument("--hotkey", default="", help='Windows: shortcut key for the Start menu entry, e.g. "Ctrl+Alt+A"')
+    d = sub.add_parser("demo", help="try chatdeck with made-up chats")
+    d.add_argument("--port", type=int, default=47199, help="default 47199"); d.add_argument("--no-open", action="store_true")
     port_arg(sub.add_parser("bubble", help="Windows: start the corner button and tray icon"))
     h = sub.add_parser("hook", help=argparse.SUPPRESS); h.add_argument("name", choices=["statusline", "waiting"])
     argv = list(sys.argv[1:] if argv is None else argv)
@@ -125,4 +149,4 @@ def main(argv=None):
         argv.insert(0, "open")   # plain `chatdeck` (with or without options) starts and opens the dashboard
     a = p.parse_args(argv)
     {"open": cmd_open, "serve": cmd_serve, "stop": cmd_stop, "setup": cmd_setup, "uninstall": cmd_uninstall,
-     "autostart": cmd_autostart, "bubble": cmd_bubble, "hook": cmd_hook}[a.cmd](a)
+     "autostart": cmd_autostart, "demo": cmd_demo, "bubble": cmd_bubble, "hook": cmd_hook}[a.cmd](a)

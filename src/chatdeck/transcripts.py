@@ -44,6 +44,8 @@ class Entry:
         elif t == "ai-title" and d.get("aiTitle"): self.ai = d["aiTitle"]
         elif t == "summary" and d.get("summary"): self.summary = d["summary"]
         elif t == "cost-state": self.cost = float(d.get("totalCostUSD") or 0)
+        elif t == "system" and d.get("subtype") == "compact_boundary":   # context shrinks right away, not at the next reply
+            self.ctx = (d.get("compactMetadata") or {}).get("postTokens") or self.ctx
         if d.get("cwd"): self.cwd = d["cwd"]
         if d.get("isSidechain") or d.get("isMeta"): return
         m = d.get("message") or {}

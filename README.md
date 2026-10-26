@@ -4,10 +4,14 @@ A local dashboard for your Claude Code chats: see which chats are running and wh
 read and search old chats, track usage against your plan limits, and clean up transcripts.
 Python 3.9+ standard library only, no dependencies.
 
+![chatdeck showing three running chats, one waiting for permission, plan limits and a week of usage](docs/dashboard.png)
+
 ## Features
 
 - **Running now** – every live session with its context size and cost. Sessions stuck on a
   permission prompt or a question get an amber **Waiting for you** badge and an optional chime.
+  **Open** jumps to the chat's terminal tab, **Rename** runs `/rename` in it, and big chats get a
+  **Compact** button that runs `/compact`.
 - **Saved chats** – read any chat without resuming it, search across all messages,
   rename (so you know what's in it), export to Markdown, resume in a terminal, delete.
 - **Usage** – tokens today and this week, top projects, 24h cost, and your 5-hour and weekly
@@ -29,6 +33,15 @@ pipx install git+https://github.com/<you>/chatdeck
 No pip? Clone the repo and run `./install.sh`. It puts a `chatdeck` command in `~/.local/bin`
 that runs straight from the clone.
 
+## Try it first
+
+```sh
+chatdeck demo
+```
+
+opens chatdeck on a set of made-up chats (in a temporary folder, deleted when you stop it with Ctrl+C),
+so you can click around without touching your own. The screenshots here are from the demo.
+
 ## Use
 
 ```sh
@@ -36,6 +49,7 @@ chatdeck                  # start the dashboard and open it
 chatdeck setup            # add the Claude Code hooks for plan limits and "waiting for you"
 chatdeck autostart on     # start it at login (Windows via WSL, macOS, Linux)
 chatdeck bubble           # Windows: the corner button and tray icon
+chatdeck demo             # try it with made-up chats
 chatdeck stop             # stop the background server
 chatdeck uninstall        # take the hooks and autostart out again
 ```
@@ -44,7 +58,27 @@ chatdeck uninstall        # take the hooks and autostart out again
 yours, so your status line looks the same. `chatdeck uninstall` puts it back, and your previous
 settings are backed up in `~/.chatdeck/backups`.
 
-The server binds to 127.0.0.1 only, and every API call needs a token that changes each run.
+## Privacy and security
+
+- Everything stays on your machine. chatdeck reads the transcripts Claude Code already writes to
+  `~/.claude/projects` and sends nothing anywhere: no accounts, no telemetry, no network calls
+  except to itself.
+- The server binds to 127.0.0.1 only. Every API call needs a token that changes each run, sent in a
+  custom header, so other websites open in your browser can't call it.
+- It only changes things you ask it to: deleting a chat removes its transcript (running chats are
+  never deleted), renaming adds a title line to it, and Rename and Compact on a running chat type
+  `/rename` or `/compact` into that chat's terminal, only while it's idle.
+- `chatdeck setup` edits `~/.claude/settings.json` and backs it up first; `chatdeck uninstall` undoes it.
+
+## Screenshots
+
+| By project | Reading a chat |
+|---|---|
+| ![chats grouped by project](docs/by-project.png) | ![a saved chat open in the viewer](docs/viewer.png) |
+
+| Light theme | The Windows pop-up |
+|---|---|
+| ![the light theme](docs/light.png) | ![the pop-up from the corner button](docs/popup.png) |
 
 ## Windows corner button and tray icon
 

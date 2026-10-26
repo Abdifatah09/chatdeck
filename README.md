@@ -19,7 +19,7 @@ Python 3.9+ standard library only, no dependencies.
 - **Cleanup** – delete empty chats or chats older than 7, 30 or 90 days. Shows disk usage.
   Running chats are never deleted.
 - **By project** view: one section per project (git repo, including its worktrees and subfolders)
-  with its running and saved chats. Sort by recent, size, cost or messages. Light and dark themes.
+  with its running and saved chats, and a **New chat** button that starts Claude Code in that project. Sort by recent, size, cost or messages. Light and dark themes.
   Keyboard shortcuts: `/` search, `j`/`k` move, `Enter` read, `r` resume, `e` rename, `x` select, `Del` delete, `?` help.
 - **Windows corner button and tray icon** – pop the dashboard up from the corner of the screen.
 

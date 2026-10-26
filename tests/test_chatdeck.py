@@ -278,6 +278,19 @@ class RenameRunningTest(Tmp):
             self.assertTrue(server.compact(SID)["ok"]); self.assertEqual(typed, ["/compact"])
 
 
+class NewChatTest(Tmp):
+    def test_opens_only_known_project_folders(self):
+        from chatdeck import server
+        proj = tempfile.mkdtemp()
+        self.write(line(type="user", message={"role": "user", "content": "hi"}, cwd=proj))
+        launched = []
+        with unittest.mock.patch.object(server, "INDEX", self.idx), unittest.mock.patch.object(server, "agents", lambda fresh=False: {}), \
+             unittest.mock.patch.object(server.terminals, "launch", lambda cwd, cmd: launched.append((cwd, cmd)) or True):
+            self.assertTrue(server.new_chat(server.project(proj))["ok"])
+            self.assertEqual(launched, [(proj, "claude")])
+            self.assertEqual(server.new_chat("/etc")["error"], "unknown project")
+
+
 class CompactTest(Tmp):
     def test_context_shrinks_at_the_compact_boundary(self):
         self.write(user("hi") + assistant([{"type": "text", "text": "hello"}], usage_={"input_tokens": 385000, "output_tokens": 5}))

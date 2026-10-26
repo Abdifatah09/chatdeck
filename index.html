@@ -106,7 +106,8 @@ details.r pre{background:var(--code);border-radius:6px;padding:6px 8px;overflow:
  <div><span>Delete</span><kbd>Del</kbd></div><div><span>Rename (in a chat)</span><kbd>e</kbd></div><div><span>Back / clear search</span><kbd>Esc</kbd></div></div>
 <div id="toast"></div>
 <script>
-const TOKEN="__TOKEN__";const $=id=>document.getElementById(id);let S=[],sel=new Set(),now=Date.now()/1000,hits={},cur=null,V=null,first=true,waitSeen=new Set();
+const TOKEN="__TOKEN__";if(new URLSearchParams(location.search).has("popup"))document.title="Claude Chats Popup";  // the desktop bubble finds its pop-up by this title
+const $=id=>document.getElementById(id);let S=[],sel=new Set(),now=Date.now()/1000,hits={},cur=null,V=null,first=true,waitSeen=new Set();
 const store={get(k,d){try{return localStorage.getItem(k)??d}catch{return d}},set(k,v){try{localStorage.setItem(k,v)}catch{}}};
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const ago=t=>{const s=now-t;return s<60?"just now":s<3600?Math.round(s/60)+" min ago":s<86400?Math.round(s/3600)+" h ago":Math.round(s/86400)+" d ago"};

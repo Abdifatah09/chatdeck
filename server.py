@@ -183,6 +183,10 @@ class H(BaseHTTPRequestHandler):
                 return self.send(200, f.read().replace("__TOKEN__", TOKEN).encode(), "text/html; charset=utf-8")
         if not self.authed(): return self.send(404, {"error": "not found"})
         if u.path == "/api/state": return self.send(200, state())
+        if u.path == "/api/summary":   # small payload for the desktop bubble's badge
+            act = agents(); w = waiting(act, INDEX.all())
+            return self.send(200, {"running": len(act), "busy": sum(a.get("status") == "busy" for a in act.values()),
+                                   "waiting": [act[sid].get("name") or "a chat" for sid in w if sid in act]})
         if u.path == "/api/search": return self.send(200, INDEX.search(q.get("q", "")[:200]))
         if u.path == "/api/chat":
             c = chat(q.get("sid", ""))

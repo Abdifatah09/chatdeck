@@ -27,6 +27,17 @@ CLAUDE_DASH_PORT=47124 python3 server.py
 
 The server binds to 127.0.0.1 only, and every API call needs a token that changes each run.
 
+## Desktop bubble (Windows)
+
+`desktop/windows/bubble.ps1` puts a small always-on-top button in the bottom-left corner of the
+screen. Click it and the dashboard pops up above it; click again, or anywhere else, and it tucks
+away. The badge counts running chats and turns amber, with a pulsing ring, when one is waiting
+for you. Drag it to move it; right-click for more. It needs the server running, and Chrome or Edge.
+
+```powershell
+powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File bubble.ps1 -Port 47123
+```
+
 ## Hooks (optional)
 
 Plan limits come from Claude Code's status line. Have your status-line script save its input:

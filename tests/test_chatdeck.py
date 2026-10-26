@@ -255,5 +255,17 @@ class RenameRunningTest(Tmp):
             self.assertEqual(server.pending_names(), {})
 
 
+    def test_compact_only_types_into_idle_chats(self):
+        from chatdeck import server
+        self.write(user("x"))
+        running, typed = {SID: {"name": "auto", "status": "busy", "kind": "interactive", "pid": 1}}, []
+        with unittest.mock.patch.object(server, "INDEX", transcripts.Index(self.dir)), unittest.mock.patch.object(server, "PROJECTS", self.dir), \
+             unittest.mock.patch.object(server, "agents", lambda fresh=False: running), \
+             unittest.mock.patch.object(server.terminals, "type_into", lambda pid, name, text: typed.append(text) or True):
+            self.assertFalse(server.compact(SID)["ok"]); self.assertEqual(typed, [])
+            running[SID]["status"] = "idle"
+            self.assertTrue(server.compact(SID)["ok"]); self.assertEqual(typed, ["/compact"])
+
+
 if __name__ == "__main__":
     unittest.main()

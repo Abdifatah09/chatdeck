@@ -187,7 +187,8 @@ function runCard(x,inProject){return `<div class="card${x.waiting?" waiting":""}
    ${x.waiting?`<div class="badge" title="${esc(x.waiting)}">Waiting for you</div> <span class="meta">${esc(x.waiting)}</span>`:""}
    <div class="meta">${where(x,inProject)}${x.waiting?"needs you":x.status==="busy"?"working":"idle"} · ${esc(x.kind||"")} · ${x.msgs} msgs${x.cost?" · "+usd(x.cost):""}</div>
    <div class="bar"><i style="width:${Math.min(100,x.ctx/1e4)}%;background:${col[cls(x.ctx)]}"></i></div>
-   <div class="meta"><b class="${cls(x.ctx)}">${k(x.ctx)} tokens</b>${x.ctx>=400e3?' · <span class="bad">expensive – type /compact or /clear in it</span>':x.ctx>=150e3?' · getting big':''}</div></div>`}
+   <div class="row" style="margin-top:3px"><span class="meta" style="flex:1;margin:0"><b class="${cls(x.ctx)}">${k(x.ctx)} tokens</b>${x.ctx>=400e3?' · <span class="bad">expensive – every message re-sends all of this</span>':x.ctx>=150e3?' · getting big':''}</span>
+   ${x.ctx>=150e3?`<button class="btn ${x.ctx>=400e3?"danger":""}" data-compact="${x.sid}" title="Run /compact in the chat: Claude summarises the conversation so far, so each message costs less">Compact</button>`:""}</div></div>`}
 function savedRow(x,inProject){const snip=hits[x.sid];return `<div class="saved${cur===x.sid?" cur":""}" data-row="${x.sid}"><input type="checkbox" data-sel="${x.sid}" ${sel.has(x.sid)?"checked":""}>
    <div class="txt" data-view="${x.sid}"><div class="name" title="${esc(x.name)}">${hl(x.name)}</div><div class="meta">${where(x,inProject)}${x.msgs} msgs · ${mb(x.size)}${x.cost?" · "+usd(x.cost):""} · ${ago(x.mtime)}</div>
    ${snip?`<div class="snip">${hl(snip)}</div>`:""}</div>
@@ -297,6 +298,9 @@ document.addEventListener("click",async e=>{if(e.target.classList.contains("ren"
   else if(t.id==="helpBtn"){$("help").classList.toggle("on")}
   else if(t.id==="vBack"){closeViewer()}
   else if(t.id==="vRen"){startRename()}
+  else if(d.compact){const x=S.find(s=>s.sid===d.compact);
+    if(confirm(`Compact "${x?x.name:"this chat"}"?\n\nClaude Code summarises the conversation so far and carries on from the summary, so each new message costs much less. Details from earlier may be summarised away.`)){
+      toast("Running /compact in the chat…",15000);const r=await getJ("/api/compact",{sid:d.compact});toast(r.ok?"Compacting – it'll shrink once Claude finishes the summary":"Couldn't compact: "+r.error,4000)}}
   else if(d.ren){const row=document.querySelector(`[data-row="${d.ren}"] .name`)||t.closest(".card")?.querySelector(".name");editName(d.ren,row)}
   else if(t.id==="vResume"&&V){await resume(V.sid)}
   else if(t.id==="vExport"&&V){await exportMd(V.sid,V.name)}

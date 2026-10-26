@@ -182,6 +182,16 @@ def rename(sid, title):
     transcripts.rename(p, sid, title)
     return {"ok": True, "title": title}
 
+def compact(sid):
+    """Run Claude Code's /compact in a running chat, the same way rename types /rename."""
+    act = agents(fresh=True); a = act.get(sid)
+    if not a: return {"ok": False, "error": "it isn't running"}
+    if a.get("status") != "idle" or sid in waiting(act, INDEX.all()):
+        return {"ok": False, "error": "it's busy - try again when it's waiting for your next message"}
+    if a.get("kind") != "interactive" or not a.get("pid") or not terminals.type_into(int(a["pid"]), a.get("name"), "/compact"):
+        return {"ok": False, "error": "couldn't reach its terminal - type /compact in it"}
+    return {"ok": True}
+
 def stop(sid):
     a = agents(fresh=True).get(sid)
     if not a or not a.get("pid"): return {"ok": False, "error": "not running"}
@@ -256,6 +266,7 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/api/delete": return self.send(200, delete(body.get("sids", [])))
         if self.path == "/api/rename": return self.send(200, rename(body.get("sid", ""), body.get("title", "")))
         if self.path == "/api/stop": return self.send(200, stop(body.get("sid", "")))
+        if self.path == "/api/compact": return self.send(200, compact(body.get("sid", "")))
         if self.path == "/api/open": return self.send(200, open_chat(body.get("sid", ""), body.get("view", False)))
         if self.path == "/api/open-running": return self.send(200, open_running(body.get("sid", "")))
         self.send(404, {"error": "not found"})

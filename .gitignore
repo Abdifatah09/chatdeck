@@ -1,3 +1,5 @@
 __pycache__/
 *.pyc
 node_modules/
+# promo videos are big; they go on the GitHub release, not in the repo (scripts/promo makes them)
+docs/media/*.mp4

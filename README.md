@@ -4,7 +4,7 @@ A local dashboard for your Claude Code chats: see which chats are running and wh
 read and search old chats, track usage against your plan limits, and clean up transcripts.
 Python 3.9+ standard library only, no dependencies.
 
-![A tour of chatdeck: a chat waiting for permission, chats grouped by project, searching and reading an old chat, and the light theme](docs/media/tour.gif)
+![A tour of chatdeck: a chat waiting for permission, chats grouped by project, searching and reading an old chat, and the light theme](https://raw.githubusercontent.com/Abdifatah09/chatdeck/main/docs/media/tour.gif)
 
 ## Features
 
@@ -74,23 +74,23 @@ settings are backed up in `~/.chatdeck/backups`.
 
 | Find any chat by what was said in it | Every project in one place |
 |---|---|
-| ![searching for "upgrade" and opening the matching chat](docs/media/search.gif) | ![switching to the by-project view, folding a project and the New chat button](docs/media/projects.gif) |
+| ![searching for "upgrade" and opening the matching chat](https://raw.githubusercontent.com/Abdifatah09/chatdeck/main/docs/media/search.gif) | ![switching to the by-project view, folding a project and the New chat button](https://raw.githubusercontent.com/Abdifatah09/chatdeck/main/docs/media/projects.gif) |
 
 | Keyboard only: `j`/`k`, `Enter`, `e` to rename, `?` for help | Running chats, at a glance |
 |---|---|
-| ![moving through saved chats, reading one and renaming it from the keyboard](docs/media/keyboard.gif) | ![three running chats: one waiting for permission, one working, one getting big](docs/media/running.png) |
+| ![moving through saved chats, reading one and renaming it from the keyboard](https://raw.githubusercontent.com/Abdifatah09/chatdeck/main/docs/media/keyboard.gif) | ![three running chats: one waiting for permission, one working, one getting big](https://raw.githubusercontent.com/Abdifatah09/chatdeck/main/docs/media/running.png) |
 
 ## Screenshots
 
-![chatdeck showing three running chats, one waiting for permission, plan limits and a week of usage](docs/dashboard.png)
+![chatdeck showing three running chats, one waiting for permission, plan limits and a week of usage](https://raw.githubusercontent.com/Abdifatah09/chatdeck/main/docs/dashboard.png)
 
 | By project | Reading a chat |
 |---|---|
-| ![chats grouped by project](docs/by-project.png) | ![a saved chat open in the viewer](docs/viewer.png) |
+| ![chats grouped by project](https://raw.githubusercontent.com/Abdifatah09/chatdeck/main/docs/by-project.png) | ![a saved chat open in the viewer](https://raw.githubusercontent.com/Abdifatah09/chatdeck/main/docs/viewer.png) |
 
 | Light theme | The Windows pop-up |
 |---|---|
-| ![the light theme](docs/light.png) | ![the pop-up from the corner button](docs/popup.png) |
+| ![the light theme](https://raw.githubusercontent.com/Abdifatah09/chatdeck/main/docs/light.png) | ![the pop-up from the corner button](https://raw.githubusercontent.com/Abdifatah09/chatdeck/main/docs/popup.png) |
 
 ## Windows corner button and tray icon
 

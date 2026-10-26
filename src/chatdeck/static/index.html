@@ -274,7 +274,7 @@ function editName(sid,el){const x=S.find(y=>y.sid===sid)||(V&&V.sid===sid?{name:
     if(save&&title&&title!==x.name){const r=await getJ("/api/rename",{sid,title});
       if(r.ok){el.textContent=r.title;if(V&&V.sid===sid)V.name=r.title;
         toast(r.typed?"Renamed – ran /rename in the chat for you":r.pending?(r.busy?"Renamed here – the chat is busy, so Claude Code gets the name when it ends":
-          "Renamed here – couldn't reach its terminal, so Claude Code gets the name when it ends"):"Renamed",r.pending?5000:2500)}
+          "Renamed here only – couldn't find its terminal tab (tabs with a locked title can't be found). Type /rename in it, or it gets the name when it ends"):"Renamed",r.pending?7000:2500)}
       else toast("Couldn't rename: "+r.error)}
     refresh(true)};
   i.addEventListener("keydown",e=>{e.stopPropagation();if(e.key==="Enter")finish(true);if(e.key==="Escape")finish(false)});i.addEventListener("blur",()=>finish(true))}

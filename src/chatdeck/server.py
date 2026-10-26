@@ -75,7 +75,8 @@ def project(cwd):
     worktrees count as the repo itself), or the folder when it isn't in a repo."""
     if not cwd: return ""
     if cwd not in _projects:
-        root = cwd.split(os.sep + ".claude" + os.sep + "worktrees" + os.sep)[0]   # Claude's worktrees, even once removed
+        # Claude's worktrees, even once removed; resolved like git resolves paths (macOS: /var is /private/var)
+        root = os.path.realpath(cwd.split(os.sep + ".claude" + os.sep + "worktrees" + os.sep)[0])
         try:
             r = subprocess.run(["git", "-C", cwd, "rev-parse", "--path-format=absolute", "--git-common-dir"],
                                capture_output=True, text=True, timeout=5)

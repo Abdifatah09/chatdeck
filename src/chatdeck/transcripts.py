@@ -196,7 +196,9 @@ def markdown(path, title):
         k = it["k"]
         if k == "user": out += ["## You", "", it["text"], ""]
         elif k == "assistant": out += ["## Claude", "", it["text"], ""]
-        elif k == "tool": out += [f"> **{it['name']}** `{it['text'].replace('`', "'")[:200]}`", ""]
+        elif k == "tool":
+            cmd = it["text"].replace("`", "'")[:200]
+            out += [f"> **{it['name']}** `{cmd}`", ""]
         elif k == "command": out += [f"> `{it['text']}`", ""]
         elif k == "compact": out += ["---", "*conversation compacted*", ""]
     return "\n".join(out)

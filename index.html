@@ -37,7 +37,7 @@ label.chk{color:var(--dim);font-size:12px;display:flex;align-items:center;gap:4p
 .saved .txt{flex:1;min-width:0;cursor:pointer}.saved .name{font-weight:500}
 .snip{color:var(--dim);font-size:11.5px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-style:italic}
 mark{background:var(--mark);color:inherit;border-radius:2px;padding:0 1px}
-.group{font-size:11.5px;color:var(--dim);margin:12px 0 2px;display:flex;gap:6px}.group b{color:var(--text);font-weight:600}
+.group{font-size:11.5px;color:var(--dim);margin:12px 0 4px;display:flex;gap:6px}#run .group:first-child{margin-top:0}.group b{color:var(--text);font-weight:600}
 #off{display:none;background:var(--offbg);color:var(--offtext);padding:6px 14px;font-size:12px}
 #toast{position:fixed;bottom:12px;left:12px;right:12px;background:var(--toast);color:var(--toasttext);padding:7px 10px;border-radius:7px;opacity:0;transition:.2s;pointer-events:none;z-index:20}#toast.on{opacity:1}
 .empty{color:var(--dim);font-size:12px;padding:6px 2px}
@@ -81,7 +81,7 @@ details.r pre{background:var(--code);border-radius:6px;padding:6px 8px;overflow:
 <h2 style="margin-top:14px">Saved chats</h2>
 <div class="tool"><input type="search" id="q" placeholder="Search names and messages  ( / )"></div>
 <div class="tool"><select class="btn" id="sort" title="Sort"><option value="recent">Recent</option><option value="size">Largest</option><option value="cost">Most expensive</option><option value="msgs">Most messages</option></select>
- <label class="chk"><input type="checkbox" id="group"> By project</label><span style="flex:1"></span>
+ <label class="chk" title="Group running and saved chats by project"><input type="checkbox" id="group"> By project</label><span style="flex:1"></span>
  <select class="btn danger" id="cleanup" title="Delete old or empty chats"></select>
  <button class="btn danger" id="delSel" style="display:none">Delete selected</button></div>
 <div id="saved"></div></main>
@@ -155,8 +155,10 @@ const proj=x=>x.cwd||"(no folder)";
 function visibleSaved(){const ws=words();let L=S.filter(x=>!x.status);
   if(ws.length)L=L.filter(x=>hits[x.sid]!==undefined||ws.every(w=>(x.name+" "+x.cwd).toLowerCase().includes(w)));
   const by={recent:x=>-x.mtime,size:x=>-x.size,cost:x=>-x.cost,msgs:x=>-x.msgs}[$("sort").value];L.sort((a,b)=>by(a)-by(b));
-  if($("group").checked){const order=[...new Set(L.map(proj))];L.sort((a,b)=>order.indexOf(proj(a))-order.indexOf(proj(b)))}
-  return L}
+  return byProject(L)}
+/* with "By project" on, keep each project together, in the order its first chat appears */
+function byProject(L){if(!$("group").checked)return L;const order=[...new Set(L.map(proj))];return L.sort((a,b)=>order.indexOf(proj(a))-order.indexOf(proj(b)))}
+const groupHead=(g,L,size=true)=>`<div class="group"><b>${esc(g)}</b> ${L.length} chat${L.length>1?"s":""}${size?" · "+mb(L.reduce((a,y)=>a+y.size,0)):""}</div>`;
 function savedRow(x){const snip=hits[x.sid];return `<div class="saved${cur===x.sid?" cur":""}" data-row="${x.sid}"><input type="checkbox" data-sel="${x.sid}" ${sel.has(x.sid)?"checked":""}>
    <div class="txt" data-view="${x.sid}"><div class="name" title="${esc(x.name)}">${hl(x.name)}</div><div class="meta">${$("group").checked?"":esc(x.cwd||"–")+" · "}${x.msgs} msgs · ${mb(x.size)}${x.cost?" · "+usd(x.cost):""} · ${ago(x.mtime)}</div>
    ${snip?`<div class="snip">${hl(snip)}</div>`:""}</div>
@@ -164,12 +166,13 @@ function savedRow(x){const snip=hits[x.sid];return `<div class="saved${cur===x.s
 function cleanupSets(){const s=S.filter(x=>!x.status),old=d=>s.filter(x=>now-x.mtime>d*86400);
   return [["empty","Empty chats",s.filter(x=>!x.msgs)],["7","Older than 7 days",old(7)],["30","Older than 30 days",old(30)],["90","Older than 90 days",old(90)]]}
 function render(){
-  const run=S.filter(x=>x.status).sort((a,b)=>!!b.waiting-!!a.waiting),all=S.filter(x=>!x.status),saved=visibleSaved(),nw=run.filter(x=>x.waiting).length;
+  const grouped=$("group").checked,run=byProject(S.filter(x=>x.status).sort((a,b)=>!!b.waiting-!!a.waiting)),all=S.filter(x=>!x.status),saved=visibleSaved(),nw=run.filter(x=>x.waiting).length;
   $("nWait").innerHTML=nw?`<span class="w">${nw} waiting for you</span> · `:"";
   $("nRun").textContent=run.length;$("nSaved").textContent=all.length;$("disk").textContent=mb(all.reduce((a,x)=>a+x.size,0));$("tok").textContent=k(run.reduce((a,x)=>a+x.ctx,0));
-  $("run").innerHTML=run.length?run.map(x=>`<div class="card${x.waiting?" waiting":""}"><div class="row"><span class="dot ${x.waiting?"wait":x.status==="busy"?"busy":""}"></span><span class="name" title="${esc(x.name)}">${esc(x.name)}</span><button class="btn" data-orun="${x.sid}">Open</button><button class="btn danger" data-stop="${x.sid}">Stop</button></div>
+  let lastG=null;
+  $("run").innerHTML=run.length?run.map(x=>(grouped&&proj(x)!==lastG?(lastG=proj(x),groupHead(lastG,run.filter(y=>proj(y)===lastG),false)):"")+`<div class="card${x.waiting?" waiting":""}"><div class="row"><span class="dot ${x.waiting?"wait":x.status==="busy"?"busy":""}"></span><span class="name" title="${esc(x.name)}">${esc(x.name)}</span><button class="btn" data-orun="${x.sid}">Open</button><button class="btn danger" data-stop="${x.sid}">Stop</button></div>
    ${x.waiting?`<div class="badge" title="${esc(x.waiting)}">Waiting for you</div> <span class="meta">${esc(x.waiting)}</span>`:""}
-   <div class="meta">${esc(x.cwd)} · ${x.waiting?"needs you":x.status==="busy"?"working":"idle"} · ${esc(x.kind||"")} · ${x.msgs} msgs${x.cost?" · "+usd(x.cost):""}</div>
+   <div class="meta">${grouped?"":esc(x.cwd)+" · "}${x.waiting?"needs you":x.status==="busy"?"working":"idle"} · ${esc(x.kind||"")} · ${x.msgs} msgs${x.cost?" · "+usd(x.cost):""}</div>
    <div class="bar"><i style="width:${Math.min(100,x.ctx/1e4)}%;background:${col[cls(x.ctx)]}"></i></div>
    <div class="meta"><b class="${cls(x.ctx)}">${k(x.ctx)} tokens</b>${x.ctx>=400e3?' · <span class="bad">expensive – type /compact or /clear in it</span>':x.ctx>=150e3?' · getting big':''}</div></div>`).join(""):'<div class="empty">No Claude sessions running.</div>';
   const cs=cleanupSets();$("cleanup").innerHTML=`<option value="">Clean up…</option>`+cs.map(([v,l,L])=>`<option value="${v}" ${L.length?"":"disabled"}>${l} (${L.length}${L.length?", "+mb(L.reduce((a,x)=>a+x.size,0)):""})</option>`).join("");
@@ -179,7 +182,7 @@ function render(){
   let html="";
   if(!S.length)html=`<div class="welcome"><b>Nothing here yet.</b><br>Start Claude Code in any folder with <code>claude</code>. Running chats show up above within a few seconds, and finished ones are kept here so you can read, search, resume or clean them up.</div>`;
   else if(!saved.length)html=`<div class="empty">${words().length?`No saved chats match “${esc($("q").value.trim())}”.`:"No saved chats."}</div>`;
-  else if($("group").checked){let g=null;for(const x of saved){if(proj(x)!==g){g=proj(x);const L=saved.filter(y=>proj(y)===g);html+=`<div class="group"><b>${esc(g)}</b> ${L.length} chats · ${mb(L.reduce((a,y)=>a+y.size,0))}</div>`}html+=savedRow(x)}}
+  else if($("group").checked){let g=null;for(const x of saved){if(proj(x)!==g){g=proj(x);html+=groupHead(g,saved.filter(y=>proj(y)===g))}html+=savedRow(x)}}
   else html=saved.map(savedRow).join("");
   $("saved").innerHTML=html;
 }

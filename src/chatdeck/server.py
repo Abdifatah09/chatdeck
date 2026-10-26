@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """chatdeck: a local dashboard for Claude Code chats.
 Lists running sessions (claude agents --json) and saved transcripts under
 ~/.claude/projects, and can view, search, rename, export and delete saved chats, stop
@@ -8,17 +7,16 @@ import json, os, glob, secrets, shlex, signal, subprocess, threading, time
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs, quote
 
-import terminals, transcripts, usage
-from transcripts import UUID
+from . import config, terminals, transcripts, usage
+from .transcripts import UUID
 
-HOME = os.path.expanduser("~")
+HOME = config.HOME
 PROJECTS = os.path.join(HOME, ".claude", "projects")
-DATA = os.environ.get("CHATDECK_DIR") or os.path.join(HOME, ".chatdeck")
+DATA = config.DATA
 STATUS, WAITING = os.path.join(DATA, "status"), os.path.join(DATA, "waiting")
-PORT = int(os.environ.get("CHATDECK_PORT") or 47123)
 TOKEN = secrets.token_hex(16)
-PAGE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "index.html")
-ASSETS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
+ASSETS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+PAGE = os.path.join(ASSETS, "index.html")
 STATIC = {"/logo.svg": ("logo.svg", "image/svg+xml"), "/logo-192.png": ("logo-192.png", "image/png"),
           "/logo-512.png": ("logo-512.png", "image/png")}
 MANIFEST = {"name": "chatdeck", "short_name": "chatdeck", "display": "standalone", "background_color": "#0f1115",
@@ -224,6 +222,15 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/api/open-running": return self.send(200, open_running(body.get("sid", "")))
         self.send(404, {"error": "not found"})
 
-if __name__ == "__main__":
+def serve(port):
+    """Run the dashboard until stopped. Raises OSError if the port is taken."""
+    httpd = ThreadingHTTPServer(("127.0.0.1", port), H)
+    os.makedirs(DATA, exist_ok=True)
+    pidfile = os.path.join(DATA, "server.pid")
+    with open(pidfile, "w") as f: f.write(str(os.getpid()))
     threading.Thread(target=_agents_loop, daemon=True).start()
-    ThreadingHTTPServer(("127.0.0.1", PORT), H).serve_forever()
+    try:
+        httpd.serve_forever()
+    finally:
+        try: os.remove(pidfile)
+        except OSError: pass

@@ -4,12 +4,14 @@ launch(cwd, command) runs a command in a new terminal tab or window.
 focus(pid, name) brings the terminal a running Claude process lives in to the front.
 Supported: WSL with Windows Terminal, macOS (Terminal and iTerm2), and Linux desktops
 (gnome-terminal, konsole, kitty, alacritty, wezterm, xfce4-terminal, xterm; focusing needs
-wmctrl or xdotool). Set CHATDECK_TERMINAL to pick a terminal by name. When nothing
+wmctrl or xdotool). Set "terminal" in the config (or CHATDECK_TERMINAL) to pick one by name. When nothing
 works, callers fall back to giving the person the command to paste."""
 import glob, os, platform, secrets, shlex, shutil, subprocess
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-CHOICE = os.environ.get("CHATDECK_TERMINAL", "")
+from . import config
+
+WINDOWS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "windows")
+CHOICE = config.get("terminal", "")
 DEVNULL = subprocess.DEVNULL
 
 
@@ -86,11 +88,11 @@ def _wsl_launch(cwd, command):
 def _wsl_focus(pid, name):
     ps = _win_exe("powershell.exe", "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe")
     if not ps: return False
-    with open(os.path.join(HERE, "focus_wt.ps1")) as f: script = f.read()
+    with open(os.path.join(WINDOWS, "focus_wt.ps1")) as f: script = f.read()
     def find(mark):
         # Optional: VirtualDesktopLib.cs (github.com/MScholtes/VirtualDesktop) lets it switch to a
-        # window on another virtual desktop reliably. Give its Windows path in CHATDECK_VDLIB.
-        env = dict(os.environ, DASH_MARK=mark, DASH_VDLIB=os.environ.get("CHATDECK_VDLIB", ""),
+        # window on another virtual desktop reliably. Give its Windows path as "vdlib" in the config.
+        env = dict(os.environ, DASH_MARK=mark, DASH_VDLIB=config.get("vdlib", ""),
                    WSLENV="DASH_MARK:DASH_VDLIB")
         try:
             r = subprocess.run([ps, "-NoProfile", "-Command", script], capture_output=True, text=True,

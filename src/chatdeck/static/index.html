@@ -97,14 +97,14 @@ details.r pre{background:var(--code);border-radius:6px;padding:6px 8px;overflow:
  <button class="btn danger" id="delSel" style="display:none">Delete selected</button></div>
 <div id="list"></div></main>
 <div id="viewer"><header><div class="top"><button class="btn" id="vBack" title="Back (Esc)">←</button><span id="vTitle"></span>
-  <button class="btn icon" id="vRen" title="Rename (e)">✎</button></div>
+  <button class="btn" id="vRen" title="Give this chat a name you'll recognise (e)">Rename</button></div>
  <div class="meta" id="vMeta" style="margin:0"></div>
  <div class="row"><button class="btn" id="vResume">Resume</button><button class="btn" id="vExport">Export .md</button>
   <label class="chk"><input type="checkbox" id="vTools" checked> Tool calls</label><span style="flex:1"></span><button class="btn danger" id="vDel">Delete</button></div></header>
  <div id="vBody"></div></div>
 <div id="help"><div><span>Search</span><kbd>/</kbd></div><div><span>Move through saved chats</span><span><kbd>j</kbd> <kbd>k</kbd></span></div>
  <div><span>Read the chat</span><kbd>Enter</kbd></div><div><span>Resume in a terminal</span><kbd>r</kbd></div><div><span>Select for bulk delete</span><kbd>x</kbd></div>
- <div><span>Delete</span><kbd>Del</kbd></div><div><span>Rename (in a chat)</span><kbd>e</kbd></div><div><span>Back / clear search</span><kbd>Esc</kbd></div></div>
+ <div><span>Delete</span><kbd>Del</kbd></div><div><span>Rename</span><kbd>e</kbd></div><div><span>Back / clear search</span><kbd>Esc</kbd></div></div>
 <div id="toast"></div>
 <script>
 const TOKEN="__TOKEN__";if(new URLSearchParams(location.search).has("popup"))document.title="chatdeck\u200b";  // reads "chatdeck"; the zero-width space lets the desktop bubble tell its pop-up from the full window
@@ -183,7 +183,7 @@ function groups(){const m=new Map(),get=k=>m.get(k)||(m.set(k,{key:k,run:[],save
 /* saved chats in the order they're on screen, for j/k */
 function visibleSaved(){return mode()==="list"?savedFiltered():groups().filter(g=>!collapsed.has(g.key)).flatMap(g=>g.saved)}
 const where=(x,inProject)=>inProject?(x.cwd&&x.cwd!==x.project?esc(x.cwd)+" · ":""):esc(x.cwd||"–")+" · ";
-function runCard(x,inProject){return `<div class="card${x.waiting?" waiting":""}"><div class="row"><span class="dot ${x.waiting?"wait":x.status==="busy"?"busy":""}"></span><span class="name" title="${esc(x.name)}">${esc(x.name)}</span><button class="btn" data-orun="${x.sid}">Open</button><button class="btn danger" data-stop="${x.sid}">Stop</button></div>
+function runCard(x,inProject){return `<div class="card${x.waiting?" waiting":""}"><div class="row"><span class="dot ${x.waiting?"wait":x.status==="busy"?"busy":""}"></span><span class="name" title="${esc(x.name)}">${esc(x.name)}</span><button class="btn" data-ren="${x.sid}" title="Rename">Rename</button><button class="btn" data-orun="${x.sid}">Open</button><button class="btn danger" data-stop="${x.sid}">Stop</button></div>
    ${x.waiting?`<div class="badge" title="${esc(x.waiting)}">Waiting for you</div> <span class="meta">${esc(x.waiting)}</span>`:""}
    <div class="meta">${where(x,inProject)}${x.waiting?"needs you":x.status==="busy"?"working":"idle"} · ${esc(x.kind||"")} · ${x.msgs} msgs${x.cost?" · "+usd(x.cost):""}</div>
    <div class="bar"><i style="width:${Math.min(100,x.ctx/1e4)}%;background:${col[cls(x.ctx)]}"></i></div>
@@ -191,7 +191,7 @@ function runCard(x,inProject){return `<div class="card${x.waiting?" waiting":""}
 function savedRow(x,inProject){const snip=hits[x.sid];return `<div class="saved${cur===x.sid?" cur":""}" data-row="${x.sid}"><input type="checkbox" data-sel="${x.sid}" ${sel.has(x.sid)?"checked":""}>
    <div class="txt" data-view="${x.sid}"><div class="name" title="${esc(x.name)}">${hl(x.name)}</div><div class="meta">${where(x,inProject)}${x.msgs} msgs · ${mb(x.size)}${x.cost?" · "+usd(x.cost):""} · ${ago(x.mtime)}</div>
    ${snip?`<div class="snip">${hl(snip)}</div>`:""}</div>
-   <button class="btn" data-open="${x.sid}">Resume</button><button class="btn danger" data-del="${x.sid}">Delete</button></div>`}
+   <button class="btn" data-ren="${x.sid}" title="Give this chat a name you'll recognise (e)">Rename</button><button class="btn" data-open="${x.sid}">Resume</button><button class="btn danger" data-del="${x.sid}">Delete</button></div>`}
 function cleanupSets(){const s=S.filter(x=>!x.status),old=d=>s.filter(x=>now-x.mtime>d*86400);
   return [["empty","Empty chats",s.filter(x=>!x.msgs)],["7","Older than 7 days",old(7)],["30","Older than 30 days",old(30)],["90","Older than 90 days",old(90)]]}
 function render(){
@@ -230,7 +230,7 @@ async function refresh(force){if(inflight&&!force)return;inflight=true;try{const
   const sig=JSON.stringify([d.chats.map(x=>[x.sid,x.name,x.status,x.ctx,x.msgs,x.size,x.cost,x.waiting]),d.usage]);
   const stale=Date.now()-lastDraw>60000;  // refresh the "x min ago" labels once a minute
   if(force||sig!==lastSig||stale){lastSig=sig;
-    if(!force&&(pressing||hovering)&&(!held||Date.now()-heldSince<8000)){if(!held)heldSince=Date.now();held=d}else{held=null;draw(d)}}
+    if(!force&&(editing||(pressing||hovering)&&(!held||Date.now()-heldSince<8000))){if(!held)heldSince=Date.now();held=d}else{held=null;draw(d)}}
  }catch(e){$("off").style.display="block"}finally{inflight=false}}
 let searchT,searchN=0;
 function onSearch(){render();clearTimeout(searchT);const q=$("q").value.trim();if(q.length<2){hits={};render();return}
@@ -249,7 +249,7 @@ function fmt(s){const parts=String(s).split(/```[^\n]*\n?/);return parts.map((p,
 async function openViewer(sid){let d;try{d=await getJ("/api/chat?sid="+sid)}catch(e){return toast("Couldn't open that chat")}
   V=d;$("viewer").classList.add("on");$("vTitle").textContent=d.name;$("vTitle").title=d.name;
   $("vMeta").textContent=`${d.cwd||"–"} · ${mb(d.size)}${d.cost?" · "+usd(d.cost):""} · ${ago(d.mtime)}${d.running?" · running":""}`;
-  $("vRen").disabled=d.running;$("vRen").title=d.running?"Running – type /rename in the chat":"Rename (e)";$("vDel").disabled=d.running;
+  $("vDel").disabled=d.running;
   let h=d.hidden?`<div class="sep">${d.hidden} earlier items not shown – export to see everything</div>`:"";
   for(const it of d.items){
     if(it.k==="user")h+=`<div class="m you"><div class="who">You</div>${fmt(it.text)}</div>`;
@@ -261,14 +261,23 @@ async function openViewer(sid){let d;try{d=await getJ("/api/chat?sid="+sid)}catc
   $("vBody").innerHTML=h||'<div class="empty">This chat has no messages.</div>';
   const m=$("vBody").querySelector("mark");if(m)m.scrollIntoView({block:"center"});else $("vBody").scrollTop=$("vBody").scrollHeight}
 function closeViewer(){$("viewer").classList.remove("on");V=null}
-function startRename(){if(!V||V.running)return;const t=$("vTitle"),i=document.createElement("input");i.className="ren";i.value=V.name;i.maxLength=80;t.replaceWith(i);i.focus();i.select();
-  let done=false;const finish=async save=>{if(done)return;done=true;const title=i.value.trim();i.replaceWith(t);
-    if(save&&title&&title!==V.name){const r=await getJ("/api/rename",{sid:V.sid,title});if(r.ok){V.name=r.title;t.textContent=r.title;toast("Renamed");refresh(true)}else toast("Couldn't rename: "+r.error)}};
-  i.addEventListener("keydown",e=>{if(e.key==="Enter")finish(true);if(e.key==="Escape"){e.stopPropagation();finish(false)}});i.addEventListener("blur",()=>finish(true))}
+/* rename in place: the name turns into a text box; Enter saves, Esc cancels. Running chats keep the name
+   Claude Code gives them, so for those it points to /rename instead. */
+let editing=false;
+function editName(sid,el){const x=S.find(y=>y.sid===sid)||(V&&V.sid===sid?{name:V.name,status:V.running}:null);if(!x||!el)return;
+  if(x.status)return toast("This chat is running – type /rename <new name> in it to rename it",4000);
+  const i=document.createElement("input");i.className="ren";i.value=x.name==="(empty)"?"":x.name;i.placeholder="Name this chat";i.maxLength=80;
+  el.replaceWith(i);i.focus();i.select();editing=true;
+  let done=false;const finish=async save=>{if(done)return;done=true;editing=false;const title=i.value.trim();i.replaceWith(el);
+    if(save&&title&&title!==x.name){const r=await getJ("/api/rename",{sid,title});
+      if(r.ok){el.textContent=r.title;if(V&&V.sid===sid)V.name=r.title;toast("Renamed")}else toast("Couldn't rename: "+r.error)}
+    refresh(true)};
+  i.addEventListener("keydown",e=>{e.stopPropagation();if(e.key==="Enter")finish(true);if(e.key==="Escape")finish(false)});i.addEventListener("blur",()=>finish(true))}
+function startRename(){if(V)editName(V.sid,$("vTitle"))}
 async function exportMd(sid,name){const b=await(await api("/api/export?sid="+sid)).blob();const a=document.createElement("a");a.href=URL.createObjectURL(b);
   a.download=(name||"chat").replace(/[^\w\- ]+/g,"-").slice(0,60)+".md";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000);toast("Exported")}
 
-document.addEventListener("click",async e=>{const t=e.target.closest("button")||e.target,d=t.dataset;
+document.addEventListener("click",async e=>{if(e.target.classList.contains("ren"))return;const t=e.target.closest("button")||e.target,d=t.dataset;
   if(t.tagName==="BUTTON"){if(t.classList.contains("busy"))return;t.classList.add("busy")}try{
   if(d.stop){const x=S.find(s=>s.sid===d.stop);if(confirm(`Stop "${x?x.name:"this session"}"? Unsaved work in progress will be interrupted.`)){const r=await getJ("/api/stop",{sid:d.stop});toast(r.ok?"Stopped":"Couldn't stop: "+r.error);setTimeout(()=>refresh(true),1500)}}
   else if(d.orun){toast("Finding its terminal…",15000);const r=await getJ("/api/open-running",{sid:d.orun});await opened(r,"Opened – "+r.how)}
@@ -284,6 +293,7 @@ document.addEventListener("click",async e=>{const t=e.target.closest("button")||
   else if(t.id==="helpBtn"){$("help").classList.toggle("on")}
   else if(t.id==="vBack"){closeViewer()}
   else if(t.id==="vRen"){startRename()}
+  else if(d.ren){const row=document.querySelector(`[data-row="${d.ren}"] .name`)||t.closest(".card")?.querySelector(".name");editName(d.ren,row)}
   else if(t.id==="vResume"&&V){await resume(V.sid)}
   else if(t.id==="vExport"&&V){await exportMd(V.sid,V.name)}
   else if(t.id==="vDel"&&V){if(await del([V.sid]))closeViewer()}
@@ -307,6 +317,7 @@ document.addEventListener("keydown",async e=>{const typing=/INPUT|SELECT|TEXTARE
   else if(!cur)return;
   else if(e.key==="Enter"||e.key==="o"){openViewer(cur);return}
   else if(e.key==="r"){await resume(cur);return}
+  else if(e.key==="e"){e.preventDefault();editName(cur,document.querySelector(`[data-row="${cur}"] .name`));return}
   else if(e.key==="x"){sel.has(cur)?sel.delete(cur):sel.add(cur)}
   else if(e.key==="Delete"||e.key==="d"){const nx=L[i+1]||L[i-1];if(await del([cur]))cur=nx?nx.sid:null}
   else return;

@@ -1,7 +1,8 @@
-import json, os, sys, tempfile, time, unittest
+import json, os, sys, tempfile, time, unittest, unittest.mock
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import transcripts, usage
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
+os.environ["CHATDECK_DIR"] = tempfile.mkdtemp()   # never touch the real ~/.chatdeck
+from chatdeck import config, hooks, transcripts, usage
 
 SID = "11111111-2222-3333-4444-555555555555"
 
@@ -132,7 +133,7 @@ class ForecastTest(unittest.TestCase):
 
 class WaitingTest(unittest.TestCase):
     def test_cleared_once_transcript_moves_on(self):
-        import server
+        from chatdeck import server
         d = tempfile.mkdtemp(); server.WAITING = d
         with open(os.path.join(d, SID + ".json"), "w") as f: json.dump({"at": 1000, "message": "needs Bash"}, f)
         class E: mtime = 999
@@ -145,23 +146,79 @@ class WaitingTest(unittest.TestCase):
 
 class TerminalTest(unittest.TestCase):
     def test_shell_line_quotes_folder(self):
-        import terminals
+        from chatdeck import terminals
         line = terminals._shell_line("/tmp/it's here", "claude --resume x")
         self.assertTrue(line.startswith("cd '/tmp/it'\"'\"'s here' && claude --resume x; exec "))
 
     def test_tty_of_unknown_pid(self):
-        import terminals
+        from chatdeck import terminals
         self.assertIsNone(terminals.tty_of(999999999))
 
 
 class ProjectTest(unittest.TestCase):
     def test_worktrees_and_subfolders_belong_to_the_repo(self):
-        import subprocess, server
+        import subprocess
+        from chatdeck import server
         repo = tempfile.mkdtemp(); os.makedirs(os.path.join(repo, "src"))
         subprocess.run(["git", "init", "-q", repo], check=True)
         self.assertEqual(server.project(os.path.join(repo, "src")), server.project(repo))
         self.assertEqual(server.project(repo + "/.claude/worktrees/gone"), server.project(repo))
         self.assertEqual(server.project("/no/such/dir"), "/no/such/dir")
+
+
+class SetupTest(unittest.TestCase):
+    def setUp(self):
+        self.path = os.path.join(tempfile.mkdtemp(), "settings.json")
+        if os.path.exists(config.FILE): os.remove(config.FILE)
+
+    def write(self, d):
+        with open(self.path, "w") as f: json.dump(d, f)
+
+    def read(self):
+        with open(self.path) as f: return json.load(f)
+
+    def test_keeps_existing_status_line_and_hooks_then_restores_them(self):
+        mine = {"type": "command", "command": "~/my-status.sh", "padding": 1}
+        other = {"matcher": "permission_prompt|elicitation_dialog", "hooks": [{"type": "command", "command": "notify.sh"}]}
+        self.write({"statusLine": mine, "hooks": {"Notification": [other], "Stop": [{"hooks": [{"type": "command", "command": "x"}]}]},
+                    "model": "opus"})
+        hooks.install(self.path, cmd="/bin/chatdeck"); hooks.install(self.path, cmd="/bin/chatdeck")   # twice: no duplicates
+        s = self.read()
+        self.assertEqual(s["statusLine"], {"type": "command", "command": "/bin/chatdeck hook statusline", "padding": 1})
+        self.assertEqual(config.load()["statusline_command"], "~/my-status.sh")
+        cmds = [h["command"] for h in s["hooks"]["Notification"][0]["hooks"]]
+        self.assertEqual(cmds, ["notify.sh", "/bin/chatdeck hook waiting"])
+        hooks.uninstall(self.path)
+        s = self.read()
+        self.assertEqual(s["statusLine"], mine)
+        self.assertEqual(s["hooks"]["Notification"], [other])
+        self.assertEqual(s["model"], "opus"); self.assertIn("Stop", s["hooks"])
+
+    def test_fresh_settings_and_legacy_hook_cleanup(self):
+        self.write({"hooks": {"Notification": [{"matcher": "x", "hooks": [{"type": "command", "command": "python3 ~/chatdeck/hooks/waiting.py"}]}]}})
+        hooks.install(self.path, cmd="cd")
+        groups = self.read()["hooks"]["Notification"]
+        self.assertEqual([g["matcher"] for g in groups], ["permission_prompt|elicitation_dialog"])
+        hooks.uninstall(self.path)
+        self.assertEqual(self.read(), {})
+
+    def test_statusline_hook_saves_payload_and_runs_wrapped(self):
+        import io
+        config.save({"statusline_command": "cat >/dev/null; echo hello"})
+        out = io.StringIO()
+        hooks.statusline(io.StringIO(json.dumps({"session_id": SID})), out)
+        self.assertEqual(out.getvalue(), "hello\n")
+        self.assertTrue(os.path.exists(os.path.join(config.DATA, "status", SID + ".json")))
+        hooks.waiting(io.StringIO(json.dumps({"session_id": SID, "message": "needs Bash"})))
+        with open(os.path.join(config.DATA, "waiting", SID + ".json")) as f: self.assertEqual(json.load(f)["message"], "needs Bash")
+
+
+class CliTest(unittest.TestCase):
+    def test_plain_options_mean_open(self):
+        from chatdeck import cli
+        with unittest.mock.patch.object(cli, "cmd_open") as m:
+            cli.main(["--no-open", "--port", "1"]); a = m.call_args[0][0]
+        self.assertEqual((a.no_open, a.port), (True, 1))
 
 
 if __name__ == "__main__":

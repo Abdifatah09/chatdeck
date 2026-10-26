@@ -17,7 +17,7 @@ header{padding:12px 14px 10px;border-bottom:1px solid var(--line)}
 main{flex:1;overflow:auto;padding:12px 14px}
 h2{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin:4px 0 8px;font-weight:600;display:flex;align-items:center;gap:6px}
 .btn{background:var(--btn);border:1px solid var(--line);color:var(--text);padding:3px 8px;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap;font-family:inherit}
-.btn:hover{border-color:var(--line2)}.btn.danger{color:var(--red)}.btn:disabled{opacity:.4;cursor:default}.btn.icon{padding:3px 6px;min-width:26px;display:inline-flex;align-items:center;justify-content:center;height:24px}.btn.icon svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.btn:hover{border-color:var(--line2)}.btn.busy{opacity:.55;cursor:progress}.btn.danger{color:var(--red)}.btn:disabled{opacity:.4;cursor:default}.btn.icon{padding:3px 6px;min-width:26px;display:inline-flex;align-items:center;justify-content:center;height:24px}.btn.icon svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 select.btn{padding:3px 4px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:9px 10px;margin-bottom:7px}
 .card.waiting{border-color:var(--amber);background:linear-gradient(var(--amberbg),var(--amberbg)),var(--panel)}
@@ -57,7 +57,7 @@ code{font-family:Consolas,"Cascadia Mono",ui-monospace,monospace;font-size:12px;
 .ugrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-bottom:8px}.tile{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:8px 10px}
 .tile .v{font-size:18px;font-weight:600;font-variant-numeric:tabular-nums}.tile .l{color:var(--dim);font-size:11px}
 .chart{display:flex;align-items:flex-end;gap:5px;height:56px;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:8px 10px 18px;position:relative;margin-bottom:8px}
-.chart div{flex:1;background:var(--chart);border-radius:3px 3px 0 0;position:relative;min-height:2px}.chart div.t{background:var(--chart2)}
+.chart div{flex:1;background:var(--chart);border-radius:3px 3px 0 0;position:relative;min-height:2px}.chart div.today{background:var(--chart2)}
 .chart div span{position:absolute;bottom:-15px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--dim)}
 .lim{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:8px 10px;margin-bottom:8px}.lim .bar{margin:4px 0 4px}
 .fc{font-size:11.5px;margin:0 0 7px}.fc:last-child{margin-bottom:0}
@@ -116,7 +116,7 @@ const usd=n=>n?"$"+(n<10?n.toFixed(2):Math.round(n)):"";
 const dur=s=>{s=Math.max(0,s);const h=Math.floor(s/3600),m=Math.round(s%3600/60);return h>=24?Math.round(h/24)+"d":h?`${h}h ${m}m`:`${m}m`};
 const clock=t=>new Date(t*1000).toLocaleString([],{weekday:(t-now>86400?"short":undefined),hour:"2-digit",minute:"2-digit"});
 const cls=n=>n<150e3?"ok":n<400e3?"warn":"bad";const col={ok:"var(--green)",warn:"var(--amber)",bad:"var(--red)"};
-const toast=m=>{$("toast").textContent=m;$("toast").classList.add("on");clearTimeout(toast.t);toast.t=setTimeout(()=>$("toast").classList.remove("on"),2200)};
+const toast=(m,ms=2200)=>{$("toast").textContent=m;$("toast").classList.add("on");clearTimeout(toast.t);toast.t=setTimeout(()=>$("toast").classList.remove("on"),ms)};
 const words=()=>$("q").value.trim().toLowerCase().split(/\s+/).filter(Boolean);
 const hl=(s,ws=words())=>{let h=esc(s);for(const w of ws){const e=esc(w).replace(/[.*+?^${}()|[\]\\]/g,"\\$&");if(e)h=h.replace(new RegExp(`(${e})(?![^<]*>)`,"gi"),"<mark>$1</mark>")}return h};
 async function api(path,body){const ac=new AbortController();const to=setTimeout(()=>ac.abort(),body?45000:15000);const r=await fetch(path,{signal:ac.signal,method:body?"POST":"GET",headers:{"X-Token":TOKEN,"Content-Type":"application/json"},body:body?JSON.stringify(body):undefined}).finally(()=>clearTimeout(to));if(!r.ok)throw new Error(r.status);return r}
@@ -157,7 +157,7 @@ function renderUsage(U){if(!U)return;const t=U.today,w=U.week_tot,fresh=a=>a[0]+
   $("usage").innerHTML=`<div class="ugrid"><div class="tile"><div class="v">${k(fresh(t))}</div><div class="l">tokens today</div></div>
    <div class="tile"><div class="v">${k(fresh(w))}</div><div class="l">last 7 days</div></div>
    <div class="tile"><div class="v">${U.cost_24h?("$"+U.cost_24h.toFixed(2)):"–"}</div><div class="l">API-equivalent cost (24h)</div></div></div>
-   ${lim}<div class="chart">${U.week.map((x,i)=>`<div class="${i===6?"t":""}" style="height:${Math.round(x[1]/max*100)}%" title="${k(x[1])} tokens"><span>${dn(x[0])}</span></div>`).join("")}</div>
+   ${lim}<div class="chart">${U.week.map((x,i)=>`<div class="${i===6?"today":""}" style="height:${Math.round(x[1]/max*100)}%" title="${k(x[1])} tokens"><span>${dn(x[0])}</span></div>`).join("")}</div>
    <div class="proj">Top this week: ${U.by_project.map(([p,n])=>`<b>${esc(p)}</b> ${k(n)}`).join(" · ")||"–"}</div>`}
 
 /* lists */
@@ -168,15 +168,16 @@ let collapsed=new Set();try{collapsed=new Set(JSON.parse(store.get("collapsed","
 function savedFiltered(){const ws=words();let L=S.filter(x=>!x.status);
   if(ws.length)L=L.filter(x=>hits[x.sid]!==undefined||ws.every(w=>(x.name+" "+x.cwd).toLowerCase().includes(w)));
   const by={recent:x=>-x.mtime,size:x=>-x.size,cost:x=>-x.cost,msgs:x=>-x.msgs}[$("sort").value];return L.sort((a,b)=>by(a)-by(b))}
-const running=()=>S.filter(x=>x.status).sort((a,b)=>!!b.waiting-!!a.waiting||b.mtime-a.mtime);
+/* orders stay put between refreshes (start time, not last activity) so nothing jumps while you aim at it */
+const running=()=>S.filter(x=>x.status).sort((a,b)=>!!b.waiting-!!a.waiting||(b.started||0)-(a.started||0));
 /* one entry per project: its running chats, its saved chats (after search and sort), and totals */
 function groups(){const m=new Map(),get=k=>m.get(k)||(m.set(k,{key:k,run:[],saved:[],all:[],last:0}),m.get(k));
   for(const x of S){const g=get(pkey(x));g.last=Math.max(g.last,x.mtime);if(x.status)g.run.push(x);else g.all.push(x)}
   for(const x of savedFiltered())get(pkey(x)).saved.push(x);
   for(const g of m.values())g.run.sort((a,b)=>!!b.waiting-!!a.waiting);
   let G=[...m.values()];if(words().length)G=G.filter(g=>g.saved.length);
-  const rank=g=>[g.run.some(x=>x.waiting)?0:1,g.run.length?0:1,-g.last];
-  return G.sort((a,b)=>{const A=rank(a),B=rank(b);return A[0]-B[0]||A[1]-B[1]||A[2]-B[2]})}
+  for(const g of m.values())g.lastSaved=Math.max(0,...g.all.map(x=>x.mtime));
+  return G.sort((a,b)=>!a.run.length-!b.run.length||(a.run.length?pname(a.key).localeCompare(pname(b.key)):b.lastSaved-a.lastSaved))}
 /* saved chats in the order they're on screen, for j/k */
 function visibleSaved(){return mode()==="list"?savedFiltered():groups().filter(g=>!collapsed.has(g.key)).flatMap(g=>g.saved)}
 const where=(x,inProject)=>inProject?(x.cwd&&x.cwd!==x.project?esc(x.cwd)+" · ":""):esc(x.cwd||"–")+" · ";
@@ -212,14 +213,22 @@ function render(){
        <div class="pbody">${g.run.map(x=>runCard(x,true)).join("")}${g.saved.map(x=>savedRow(x,true)).join("")}${!g.run.length&&!g.saved.length?'<div class="empty">No chats.</div>':""}</div></div>`}).join(""):noMatch}
   $("list").innerHTML=html;
 }
-let lastSig="",lastDraw=0,pressing=false;
-document.addEventListener("mousedown",()=>pressing=true,true);document.addEventListener("mouseup",()=>setTimeout(()=>pressing=false,300),true);
+let lastSig="",lastDraw=0,pressing=false,hovering=false,heldSince=0,held=null;
+const HOT="button,select,input,.txt,.phead";
+document.addEventListener("mousedown",()=>pressing=true,true);
+window.addEventListener("mouseup",()=>setTimeout(()=>{pressing=false;flush()},300),true);window.addEventListener("blur",()=>{pressing=false;flush()});
+document.addEventListener("mouseover",e=>{hovering=!!e.target.closest(HOT);if(!hovering)flush()});
+document.documentElement.addEventListener("mouseleave",()=>{hovering=false;flush()});
+/* a redraw that arrived while the mouse was on a control; drawn when it moves off, or after 8s at most */
+function flush(){if(held&&!pressing){const d=held;held=null;draw(d)}}
+function draw(d){S=d.chats;now=d.now;lastDraw=Date.now();render();renderUsage(d.usage)}
 let inflight=false;
 async function refresh(force){if(inflight&&!force)return;inflight=true;try{const d=await getJ("/api/state");$("off").style.display="none";
   const ws=new Set(d.chats.filter(x=>x.waiting).map(x=>x.sid));if(!first&&[...ws].some(s=>!waitSeen.has(s)))beep();waitSeen=ws;first=false;
   const sig=JSON.stringify([d.chats.map(x=>[x.sid,x.name,x.status,x.ctx,x.msgs,x.size,x.cost,x.waiting]),d.usage]);
   const stale=Date.now()-lastDraw>60000;  // refresh the "x min ago" labels once a minute
-  if(force||sig!==lastSig||stale){ if(pressing&&!force) return; S=d.chats;now=d.now;lastSig=sig;lastDraw=Date.now();render();renderUsage(d.usage) }
+  if(force||sig!==lastSig||stale){lastSig=sig;
+    if(!force&&(pressing||hovering)&&(!held||Date.now()-heldSince<8000)){if(!held)heldSince=Date.now();held=d}else{held=null;draw(d)}}
  }catch(e){$("off").style.display="block"}finally{inflight=false}}
 let searchT,searchN=0;
 function onSearch(){render();clearTimeout(searchT);const q=$("q").value.trim();if(q.length<2){hits={};render();return}
@@ -257,9 +266,10 @@ function startRename(){if(!V||V.running)return;const t=$("vTitle"),i=document.cr
 async function exportMd(sid,name){const b=await(await api("/api/export?sid="+sid)).blob();const a=document.createElement("a");a.href=URL.createObjectURL(b);
   a.download=(name||"chat").replace(/[^\w\- ]+/g,"-").slice(0,60)+".md";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000);toast("Exported")}
 
-document.addEventListener("click",async e=>{const t=e.target,d=t.dataset;try{
+document.addEventListener("click",async e=>{const t=e.target.closest("button")||e.target,d=t.dataset;
+  if(t.tagName==="BUTTON"){if(t.classList.contains("busy"))return;t.classList.add("busy")}try{
   if(d.stop){const x=S.find(s=>s.sid===d.stop);if(confirm(`Stop "${x?x.name:"this session"}"? Unsaved work in progress will be interrupted.`)){const r=await getJ("/api/stop",{sid:d.stop});toast(r.ok?"Stopped":"Couldn't stop: "+r.error);setTimeout(()=>refresh(true),1500)}}
-  else if(d.orun){toast("Opening…");const r=await getJ("/api/open-running",{sid:d.orun});await opened(r,"Opened – "+r.how)}
+  else if(d.orun){toast("Finding its terminal…",15000);const r=await getJ("/api/open-running",{sid:d.orun});await opened(r,"Opened – "+r.how)}
   else if(d.mode){store.set("mode",d.mode);cur=null;render()}
   else if(t.closest("[data-ptoggle]")){const g=t.closest("[data-ptoggle]").dataset.ptoggle;collapsed.has(g)?collapsed.delete(g):collapsed.add(g);store.set("collapsed",JSON.stringify([...collapsed]));render()}
   else if(d.open){await resume(d.open)}
@@ -276,7 +286,7 @@ document.addEventListener("click",async e=>{const t=e.target,d=t.dataset;try{
   else if(t.id==="vExport"&&V){await exportMd(V.sid,V.name)}
   else if(t.id==="vDel"&&V){if(await del([V.sid]))closeViewer()}
   if(t.id!=="helpBtn")$("help").classList.remove("on");
-}catch(err){toast("Something went wrong: "+err.message)}});
+}catch(err){toast("Something went wrong: "+err.message)}finally{t.classList.remove("busy")}});
 document.addEventListener("change",async e=>{const t=e.target,s=t.dataset.sel;
   if(s){t.checked?sel.add(s):sel.delete(s);render()}
   else if(t.id==="sort"){store.set("sort",t.value);render()}

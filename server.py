@@ -84,13 +84,13 @@ def state():
         out.append({"sid": sid, "name": a.get("name") or e.title or "(empty)",
                     "cwd": (a.get("cwd") or e.cwd or "").replace(HOME, "~"), "project": project(a.get("cwd") or e.cwd),
                     "ctx": e.ctx, "msgs": e.msgs, "mtime": e.mtime, "size": e.size, "cost": round(e.cost, 2),
-                    "status": a.get("status"), "kind": a.get("kind"), "waiting": wait.get(sid)})
+                    "status": a.get("status"), "kind": a.get("kind"), "started": a.get("startedAt"), "waiting": wait.get(sid)})
     for sid, a in act.items():  # running but no transcript yet
         if sid not in chats:
             out.append({"sid": sid, "name": a.get("name") or "(new chat)", "cwd": (a.get("cwd") or "").replace(HOME, "~"),
                         "project": project(a.get("cwd")),
                         "ctx": 0, "msgs": 0, "mtime": time.time(), "size": 0, "cost": 0, "status": a.get("status"),
-                        "kind": a.get("kind"), "waiting": wait.get(sid)})
+                        "kind": a.get("kind"), "started": a.get("startedAt"), "waiting": wait.get(sid)})
     out.sort(key=lambda x: -x["mtime"])
     return {"chats": out, "now": time.time(), "usage": usage.summary([e for _, e in chats.values()], STATUS, LIMITS)}
 

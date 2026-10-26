@@ -249,6 +249,16 @@ def open_chat(sid, view=False):
     if terminals.launch(cwd, inner): return {"ok": True}
     return {"ok": False, "copy": manual(cwd, inner)}
 
+def new_chat(proj):
+    """Start a new Claude Code chat in a project folder. Only folders chatdeck lists as projects are allowed."""
+    if config.DEMO: return DEMO_OFF
+    known = {chat_project(e) for _, e in INDEX.all().values()} | {project(a.get("cwd")) for a in agents().values()}
+    if proj not in known: return {"ok": False, "error": "unknown project"}
+    cwd = os.path.join(HOME, proj[2:]) if proj.startswith("~/") else HOME if proj == "~" else proj
+    if not os.path.isdir(cwd): return {"ok": False, "error": f"{proj} doesn't exist any more"}
+    if terminals.launch(cwd, "claude"): return {"ok": True}
+    return {"ok": False, "copy": manual(cwd, "claude")}
+
 def chat(sid):
     p = transcript(sid)
     if not p: return None
@@ -304,6 +314,7 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/api/stop": return self.send(200, stop(body.get("sid", "")))
         if self.path == "/api/compact": return self.send(200, compact(body.get("sid", "")))
         if self.path == "/api/open": return self.send(200, open_chat(body.get("sid", ""), body.get("view", False)))
+        if self.path == "/api/new": return self.send(200, new_chat(body.get("project", "")))
         if self.path == "/api/open-running": return self.send(200, open_running(body.get("sid", "")))
         self.send(404, {"error": "not found"})
 

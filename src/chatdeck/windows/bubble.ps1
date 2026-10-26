@@ -201,7 +201,7 @@ Add-Item "Open the full dashboard" { $b = Browser; if ($b) { Start-Process $b -A
 Add-Item "Move back to the corner" { Home-Position; Save-Position }
 $menu.Items.Add((New-Object System.Windows.Controls.Separator)) | Out-Null
 Add-Item "Hide for an hour" { Hide-Bubble ((Get-Date).AddHours(1)) }
-Add-Item "Hide (start it again to bring it back)" { Hide-Bubble ([DateTime]::MaxValue) }
+Add-Item "Hide (the tray icon brings it back)" { Hide-Bubble ([DateTime]::MaxValue) }
 Add-Item "Quit" { $win.Close() }
 $win.ContextMenu = $menu
 
@@ -297,4 +297,7 @@ $pollTimer.Add_Tick({ Update-Badge })
 $win.Add_SourceInitialized({ $script:self = (New-Object System.Windows.Interop.WindowInteropHelper($win)).Handle })
 # Started with -WindowStyle Hidden, Windows applies "hidden" to the first window the process shows, so show it explicitly.
 $win.Add_Loaded({ [U]::ShowWindow($script:self, 4) | Out-Null; Update-Badge; $pollTimer.Start(); $focusTimer.Start() })
-$win.ShowDialog() | Out-Null
+# Run a message loop rather than ShowDialog: hiding a dialog ends it, which took the tray icon down with the bubble.
+$win.Add_Closed({ [System.Windows.Threading.Dispatcher]::CurrentDispatcher.InvokeShutdown() })
+$win.Show()
+[System.Windows.Threading.Dispatcher]::Run()

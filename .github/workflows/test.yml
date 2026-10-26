@@ -2,6 +2,7 @@ name: tests
 
 on:
   push:
+    branches: [main]   # branches are tested through their pull request, so each push runs once
   pull_request:
 
 jobs:

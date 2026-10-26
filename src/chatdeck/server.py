@@ -69,19 +69,27 @@ def waiting(act, chats):
             pass
     return out
 
+def _as_written(cwd, real):
+    """git answers with symlinks resolved (macOS: /var is /private/var); give the folder as cwd spells it."""
+    d = cwd
+    while True:
+        if os.path.realpath(d) == real: return d
+        up = os.path.dirname(d)
+        if up == d: return real
+        d = up
+
 _projects = {}
 def project(cwd):
     """The project a folder belongs to: the main checkout of its git repo (so subfolders and
     worktrees count as the repo itself), or the folder when it isn't in a repo."""
     if not cwd: return ""
     if cwd not in _projects:
-        # Claude's worktrees, even once removed; resolved like git resolves paths (macOS: /var is /private/var)
-        root = os.path.realpath(cwd.split(os.sep + ".claude" + os.sep + "worktrees" + os.sep)[0])
+        root = cwd.split(os.sep + ".claude" + os.sep + "worktrees" + os.sep)[0]   # Claude's worktrees, even once removed
         try:
             r = subprocess.run(["git", "-C", cwd, "rev-parse", "--path-format=absolute", "--git-common-dir"],
                                capture_output=True, text=True, timeout=5)
             common = r.stdout.strip()
-            if r.returncode == 0 and os.path.basename(common) == ".git": root = os.path.dirname(common)
+            if r.returncode == 0 and os.path.basename(common) == ".git": root = _as_written(cwd, os.path.dirname(common))
         except (OSError, subprocess.TimeoutExpired):
             pass
         _projects[cwd] = root

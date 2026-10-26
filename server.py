@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Claude chats dashboard: local-only server for the AOC sidebar.
+"""chatdeck: a local dashboard for Claude Code chats.
 Lists running sessions (claude agents --json) and saved transcripts under
 ~/.claude/projects, and can view, search, rename, export and delete saved chats, stop
 sessions, and open chats in a terminal (see terminals.py). Binds 127.0.0.1 only; every API call needs
@@ -13,9 +13,9 @@ from transcripts import UUID
 
 HOME = os.path.expanduser("~")
 PROJECTS = os.path.join(HOME, ".claude", "projects")
-DATA = os.environ.get("CLAUDE_DASH_DIR") or os.path.join(HOME, ".claude", "dash")
+DATA = os.environ.get("CHATDECK_DIR") or os.path.join(HOME, ".chatdeck")
 STATUS, WAITING = os.path.join(DATA, "status"), os.path.join(DATA, "waiting")
-PORT = int(os.environ.get("CLAUDE_DASH_PORT") or 47123)
+PORT = int(os.environ.get("CHATDECK_PORT") or 47123)
 TOKEN = secrets.token_hex(16)
 PAGE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "index.html")
 INDEX = transcripts.Index(PROJECTS)

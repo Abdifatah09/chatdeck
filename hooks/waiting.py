@@ -11,7 +11,7 @@ try:
     d = json.load(sys.stdin)
     sid = d.get("session_id", "")
     if re.fullmatch(r"[0-9a-f-]{36}", sid):
-        out = os.path.join(os.environ.get("CLAUDE_DASH_DIR") or os.path.expanduser("~/.claude/dash"), "waiting")
+        out = os.path.join(os.environ.get("CHATDECK_DIR") or os.path.expanduser("~/.chatdeck"), "waiting")
         os.makedirs(out, exist_ok=True)
         with open(os.path.join(out, sid + ".json.tmp"), "w") as f:
             json.dump({"at": time.time(), "message": d.get("message", ""), "type": d.get("notification_type", "")}, f)

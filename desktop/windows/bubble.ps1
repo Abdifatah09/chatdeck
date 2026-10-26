@@ -1,5 +1,5 @@
 <#
-  Claude Chats bubble: a small always-on-top button in the bottom-left corner of the screen.
+  chatdeck bubble: a small always-on-top button in the bottom-left corner of the screen.
   Click it to pop the dashboard up above it; click it again, or anywhere else, to tuck it away.
   Drag it to move it. Right-click to hide it or for more. Starting it again while it is hidden
   brings it back. The badge counts running chats and turns amber, with a pulsing ring, when a
@@ -13,8 +13,8 @@ param([int]$Port = 47123, [int]$PopupWidth = 460, [int]$PopupHeight = 760)
 
 # One bubble at a time: starting it again just asks the running one to show itself.
 $created = $false
-$script:mutex = New-Object System.Threading.Mutex($true, "Local\ClaudeChatsBubble", [ref]$created)
-$script:showSignal = New-Object System.Threading.EventWaitHandle($false, [System.Threading.EventResetMode]::AutoReset, "Local\ClaudeChatsBubbleShow")
+$script:mutex = New-Object System.Threading.Mutex($true, "Local\ChatdeckBubble", [ref]$created)
+$script:showSignal = New-Object System.Threading.EventWaitHandle($false, [System.Threading.EventResetMode]::AutoReset, "Local\ChatdeckBubbleShow")
 if (-not $created) { $script:showSignal.Set() | Out-Null; exit }
 
 Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase, System.Windows.Forms, System.Drawing
@@ -42,9 +42,9 @@ public static class U {
 [System.Net.WebRequest]::DefaultWebProxy = $null   # skip proxy detection, which adds seconds per request
 
 $Base = "http://127.0.0.1:$Port"
-$PopupTitle = "Claude Chats Popup"
+$PopupTitle = "chatdeck popup"
 $Size = 64
-$StateFile = Join-Path $env:APPDATA "claude-dash\bubble.json"
+$StateFile = Join-Path $env:APPDATA "chatdeck\bubble.json"
 $script:token = $null
 $script:shown = $false
 $script:shownAt = [DateTime]::MinValue
@@ -65,7 +65,7 @@ function Get-Summary {
 [xml]$xaml = @"
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Claude Chats Bubble" Width="$Size" Height="$Size" WindowStyle="None" AllowsTransparency="True"
+        Title="chatdeck bubble" Width="$Size" Height="$Size" WindowStyle="None" AllowsTransparency="True"
         Background="Transparent" Topmost="True" ShowInTaskbar="False" ResizeMode="NoResize" Cursor="Hand">
   <Grid>
     <Ellipse x:Name="Ring" Width="58" Height="58" Stroke="#F5B942" StrokeThickness="3" Opacity="0"/>
@@ -85,7 +85,7 @@ $win = [Windows.Markup.XamlReader]::Load((New-Object System.Xml.XmlNodeReader $x
 $ring = $win.FindName("Ring"); $disc = $win.FindName("Disc"); $glyph = $win.FindName("Glyph")
 $badge = $win.FindName("Badge"); $count = $win.FindName("Count")
 $glyph.Text = [string][char]0x2733
-$win.ToolTip = "Claude chats"
+$win.ToolTip = "chatdeck"
 
 $pulse = New-Object System.Windows.Media.Animation.DoubleAnimation(0.25, 1, [TimeSpan]::FromMilliseconds(700))
 $pulse.AutoReverse = $true; $pulse.RepeatBehavior = [System.Windows.Media.Animation.RepeatBehavior]::Forever
@@ -140,7 +140,7 @@ function Show-Popup($from = "bubble") {
   $h = Popup-Handle
   if ($h -eq [IntPtr]::Zero) {
     $b = Browser
-    if (-not $b) { [System.Windows.MessageBox]::Show("The pop-up needs Chrome or Edge.", "Claude chats") | Out-Null; return }
+    if (-not $b) { [System.Windows.MessageBox]::Show("The pop-up needs Chrome or Edge.", "chatdeck") | Out-Null; return }
     Start-Process $b -ArgumentList "--app=$Base/?popup=1", "--window-size=$PopupWidth,$PopupHeight"
     for ($i = 0; $i -lt 60 -and $h -eq [IntPtr]::Zero; $i++) { Start-Sleep -Milliseconds 100; $h = Popup-Handle }
     if ($h -eq [IntPtr]::Zero) { return }
@@ -183,7 +183,7 @@ $win.ContextMenu = $menu
 
 # --- the tray icon ------------------------------------------------------------------------------
 $tray = New-Object System.Windows.Forms.NotifyIcon
-$tray.Text = "Claude chats"
+$tray.Text = "chatdeck"
 $tray.Add_MouseClick({ param($s, $e) if ($e.Button -eq [System.Windows.Forms.MouseButtons]::Left) { Toggle-Popup "tray" } })
 $trayMenu = New-Object System.Windows.Forms.ContextMenuStrip
 function Add-TrayItem($text, $action) { $i = $trayMenu.Items.Add($text); $i.Add_Click($action); $i }
@@ -260,12 +260,12 @@ function Update-Badge {
       $badge.Background = "#3ECF8E"; $count.Text = $s.running
       $badge.Visibility = $(if ($s.running) { "Visible" } else { "Collapsed" })
       $win.ToolTip = $(if ($s.running) { "$($s.running) running, $($s.busy) working" } else { "No chats running" })
-      Set-Tray $(if ($s.running) { "$($s.running)" } else { "" }) 0xFF3ECF8E "Claude chats: $($win.ToolTip)"
+      Set-Tray $(if ($s.running) { "$($s.running)" } else { "" }) 0xFF3ECF8E "chatdeck: $($win.ToolTip)"
     }
     $script:wasWaiting = [bool]$waiting.Count
   } catch {
     $disc.Opacity = 0.45; $badge.Visibility = "Collapsed"; $win.ToolTip = "Dashboard server isn't running"
-    Set-Tray "" 0 "Claude chats: the dashboard server isn't running"
+    Set-Tray "" 0 "chatdeck: the dashboard server isn't running"
   }
 }
 $pollTimer = New-Object System.Windows.Threading.DispatcherTimer

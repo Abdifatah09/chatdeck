@@ -1,4 +1,4 @@
-# Claude Chats dashboard
+# chatdeck
 
 A small local dashboard for Claude Code: see which chats are running and which need you,
 read and search old chats, track usage against your plan limits, and clean up transcripts.
@@ -22,7 +22,7 @@ Python standard library only, no dependencies.
 
 ```sh
 python3 server.py            # http://127.0.0.1:47123
-CLAUDE_DASH_PORT=47124 python3 server.py
+CHATDECK_PORT=47124 python3 server.py
 ```
 
 The server binds to 127.0.0.1 only, and every API call needs a token that changes each run.
@@ -47,7 +47,8 @@ Plan limits come from Claude Code's status line. Have your status-line script sa
 ```sh
 input=$(cat)
 sid=$(printf '%s' "$input" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("session_id",""))')
-[ -n "$sid" ] && printf '%s' "$input" > ~/.claude/dash/status/$sid.json
+mkdir -p ~/.chatdeck/status
+[ -n "$sid" ] && printf '%s' "$input" > ~/.chatdeck/status/$sid.json
 ```
 
 To get the "Waiting for you" badge, add this to `~/.claude/settings.json`:
@@ -81,10 +82,10 @@ When no terminal can be opened, the dashboard copies the command to paste instea
 
 Settings (environment variables):
 
-- `CLAUDE_DASH_PORT`: port, default 47123
-- `CLAUDE_DASH_TERMINAL`: which terminal to use, e.g. `kitty` or `iterm`
-- `CLAUDE_DASH_DIR`: where the dashboard keeps its data, default `~/.claude/dash`
-- `CLAUDE_DASH_VDLIB` (WSL): Windows path to [VirtualDesktopLib.cs](https://github.com/MScholtes/VirtualDesktop), which makes
+- `CHATDECK_PORT`: port, default 47123
+- `CHATDECK_TERMINAL`: which terminal to use, e.g. `kitty` or `iterm`
+- `CHATDECK_DIR`: where the dashboard keeps its data, default `~/.chatdeck`
+- `CHATDECK_VDLIB` (WSL): Windows path to [VirtualDesktopLib.cs](https://github.com/MScholtes/VirtualDesktop), which makes
   switching to a chat on another virtual desktop reliable
 
 Finding a running chat works by briefly giving its tab a unique title, so it doesn't work for

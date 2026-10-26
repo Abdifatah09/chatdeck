@@ -4,12 +4,12 @@ launch(cwd, command) runs a command in a new terminal tab or window.
 focus(pid, name) brings the terminal a running Claude process lives in to the front.
 Supported: WSL with Windows Terminal, macOS (Terminal and iTerm2), and Linux desktops
 (gnome-terminal, konsole, kitty, alacritty, wezterm, xfce4-terminal, xterm; focusing needs
-wmctrl or xdotool). Set CLAUDE_DASH_TERMINAL to pick a terminal by name. When nothing
+wmctrl or xdotool). Set CHATDECK_TERMINAL to pick a terminal by name. When nothing
 works, callers fall back to giving the person the command to paste."""
 import glob, os, platform, secrets, shlex, shutil, subprocess
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-CHOICE = os.environ.get("CLAUDE_DASH_TERMINAL", "")
+CHOICE = os.environ.get("CHATDECK_TERMINAL", "")
 DEVNULL = subprocess.DEVNULL
 
 
@@ -54,7 +54,7 @@ def _tagged(pid, name, find):
     so this identifies the exact tab."""
     tty = tty_of(pid)
     if not tty: return False
-    mark = "claude-dash-" + secrets.token_hex(4)
+    mark = "chatdeck-" + secrets.token_hex(4)
     try:
         _set_title(tty, mark)
         return find(mark)
@@ -89,8 +89,8 @@ def _wsl_focus(pid, name):
     with open(os.path.join(HERE, "focus_wt.ps1")) as f: script = f.read()
     def find(mark):
         # Optional: VirtualDesktopLib.cs (github.com/MScholtes/VirtualDesktop) lets it switch to a
-        # window on another virtual desktop reliably. Give its Windows path in CLAUDE_DASH_VDLIB.
-        env = dict(os.environ, DASH_MARK=mark, DASH_VDLIB=os.environ.get("CLAUDE_DASH_VDLIB", ""),
+        # window on another virtual desktop reliably. Give its Windows path in CHATDECK_VDLIB.
+        env = dict(os.environ, DASH_MARK=mark, DASH_VDLIB=os.environ.get("CHATDECK_VDLIB", ""),
                    WSLENV="DASH_MARK:DASH_VDLIB")
         try:
             r = subprocess.run([ps, "-NoProfile", "-Command", script], capture_output=True, text=True,

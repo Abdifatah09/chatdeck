@@ -3,7 +3,8 @@
   Click it to pop the dashboard up above it; click it again, or anywhere else, to tuck it away.
   Drag it to move it. Right-click to hide it or for more. Starting it again while it is hidden
   brings it back. The badge counts running chats and turns amber, with a pulsing ring, when a
-  chat is waiting for you.
+  chat is waiting for you. The same badge sits in the notification area (by the clock), where a
+  click pops the dashboard up in the bottom-right corner instead.
 
   Needs the dashboard server running, and Chrome or Edge for the pop-up.
   powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File bubble.ps1 [-Port 47123]
@@ -16,7 +17,7 @@ $script:mutex = New-Object System.Threading.Mutex($true, "Local\ClaudeChatsBubbl
 $script:showSignal = New-Object System.Threading.EventWaitHandle($false, [System.Threading.EventResetMode]::AutoReset, "Local\ClaudeChatsBubbleShow")
 if (-not $created) { $script:showSignal.Set() | Out-Null; exit }
 
-Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase
+Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase, System.Windows.Forms, System.Drawing
 Add-Type @'
 using System; using System.Runtime.InteropServices;
 public static class U {
@@ -29,6 +30,9 @@ public static class U {
   [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr h);
   [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int w, int hh, uint f);
   [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
+  [DllImport("user32.dll")] public static extern bool DestroyIcon(IntPtr h);
+  [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern int GetClassName(IntPtr h, System.Text.StringBuilder s, int n);
+  public static string ClassOf(IntPtr h) { var s = new System.Text.StringBuilder(128); GetClassName(h, s, 128); return s.ToString(); }
   [DllImport("user32.dll")] static extern void keybd_event(byte k, byte s, uint f, UIntPtr e);
   public static void Front(IntPtr h) {   // an Alt tap lets a background process take focus
     keybd_event(0x12, 0, 0, UIntPtr.Zero); keybd_event(0x12, 0, 2, UIntPtr.Zero); SetForegroundWindow(h);
@@ -45,6 +49,7 @@ $script:token = $null
 $script:shown = $false
 $script:shownAt = [DateTime]::MinValue
 $script:hiddenUntil = $null   # set while the bubble itself is hidden
+$script:anchor = "bubble"     # where the pop-up opens: above the bubble, or above the tray
 
 # --- talking to the server -------------------------------------------------------------------
 function Get-Summary {
@@ -115,18 +120,23 @@ function Browser {
 }
 
 function Place-Popup($h) {
-  # Above the bubble, lined up with whichever edge of the screen the bubble is nearer; kept on screen.
+  # Above the bubble, lined up with whichever edge of the screen the bubble is nearer, or in the
+  # bottom-right corner when opened from the tray; kept on screen.
   $wa = [System.Windows.SystemParameters]::WorkArea
   $scale = [System.Windows.PresentationSource]::FromVisual($win).CompositionTarget.TransformToDevice.M11
-  $left = if ($win.Left + $Size / 2 -lt $wa.Left + $wa.Width / 2) { $win.Left + 4 } else { $win.Left + $Size - 4 - $PopupWidth }
-  $top = $win.Top - 6 - $PopupHeight
+  if ($script:anchor -eq "tray") { $left = $wa.Right - 8 - $PopupWidth; $top = $wa.Bottom - 8 - $PopupHeight }
+  else {
+    $left = if ($win.Left + $Size / 2 -lt $wa.Left + $wa.Width / 2) { $win.Left + 4 } else { $win.Left + $Size - 4 - $PopupWidth }
+    $top = $win.Top - 6 - $PopupHeight
+  }
   if ($top -lt $wa.Top) { $top = $wa.Top }
   $left = [Math]::Max($wa.Left, [Math]::Min($left, $wa.Right - $PopupWidth))
   [U]::SetWindowPos($h, [IntPtr]::Zero, [int]($left * $scale), [int]($top * $scale),
                     [int]($PopupWidth * $scale), [int]($PopupHeight * $scale), 0x14) | Out-Null   # no z-order change, no activate
 }
 
-function Show-Popup {
+function Show-Popup($from = "bubble") {
+  $script:anchor = $from
   $h = Popup-Handle
   if ($h -eq [IntPtr]::Zero) {
     $b = Browser
@@ -147,7 +157,7 @@ function Hide-Popup {
   $script:shown = $false
 }
 
-function Toggle-Popup { if ($script:shown) { Hide-Popup } else { Show-Popup } }
+function Toggle-Popup($from = "bubble") { if ($script:shown) { Hide-Popup } else { Show-Popup $from } }
 
 function Hide-Bubble($until) { Hide-Popup; $win.Hide(); $script:hiddenUntil = $until }
 function Show-Bubble { $script:hiddenUntil = $null; $win.Show(); [U]::ShowWindow($script:self, 4) | Out-Null }
@@ -157,7 +167,7 @@ $win.Add_MouseLeftButtonDown({
   $l = $win.Left; $t = $win.Top
   $win.DragMove()
   if ([Math]::Abs($win.Left - $l) -lt 3 -and [Math]::Abs($win.Top - $t) -lt 3) { Toggle-Popup }
-  else { Save-Position; if ($script:shown) { $h = Popup-Handle; if ($h -ne [IntPtr]::Zero) { Place-Popup $h } } }
+  else { Save-Position; if ($script:shown -and $script:anchor -eq "bubble") { $h = Popup-Handle; if ($h -ne [IntPtr]::Zero) { Place-Popup $h } } }
 })
 
 $menu = New-Object System.Windows.Controls.ContextMenu
@@ -171,7 +181,49 @@ Add-Item "Hide (start it again to bring it back)" { Hide-Bubble ([DateTime]::Max
 Add-Item "Quit" { $win.Close() }
 $win.ContextMenu = $menu
 
+# --- the tray icon ------------------------------------------------------------------------------
+$tray = New-Object System.Windows.Forms.NotifyIcon
+$tray.Text = "Claude chats"
+$tray.Add_MouseClick({ param($s, $e) if ($e.Button -eq [System.Windows.Forms.MouseButtons]::Left) { Toggle-Popup "tray" } })
+$trayMenu = New-Object System.Windows.Forms.ContextMenuStrip
+function Add-TrayItem($text, $action) { $i = $trayMenu.Items.Add($text); $i.Add_Click($action); $i }
+Add-TrayItem "Show chats" { Show-Popup "tray" } | Out-Null
+Add-TrayItem "Open the full dashboard" { $b = Browser; if ($b) { Start-Process $b -ArgumentList "--app=$Base/" } } | Out-Null
+$bubbleItem = Add-TrayItem "Show the corner button" { if ($script:hiddenUntil) { Show-Bubble } else { Hide-Bubble ([DateTime]::MaxValue) } }
+$trayMenu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
+Add-TrayItem "Quit" { $win.Close() } | Out-Null
+$trayMenu.Add_Opening({ $bubbleItem.Text = $(if ($script:hiddenUntil) { "Show the corner button" } else { "Hide the corner button" }) })
+$tray.ContextMenuStrip = $trayMenu
+
+# The tray icon is drawn here: the same asterisk, with a count badge in its corner.
+$script:trayKey = $null; $script:trayIcon = $null; $script:trayHandle = [IntPtr]::Zero
+function Set-Tray($label, $argb, $tip) {
+  $key = "$label|$argb"
+  if ($key -ne $script:trayKey) {
+    $bmp = New-Object System.Drawing.Bitmap 32, 32
+    $g = [System.Drawing.Graphics]::FromImage($bmp)
+    $g.SmoothingMode = "AntiAlias"; $g.TextRenderingHint = "AntiAliasGridFit"
+    $center = New-Object System.Drawing.StringFormat; $center.Alignment = "Center"; $center.LineAlignment = "Center"
+    $g.FillEllipse((New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(255, 27, 31, 39))), 0, 0, 31, 31)
+    $glyphFont = New-Object System.Drawing.Font("Segoe UI Symbol", 17, [System.Drawing.FontStyle]::Bold, [System.Drawing.GraphicsUnit]::Pixel)
+    $g.DrawString([string][char]0x2733, $glyphFont, [System.Drawing.Brushes]::WhiteSmoke, (New-Object System.Drawing.RectangleF(0, 0, 32, 31)), $center)
+    if ($label) {
+      $g.FillEllipse((New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb($argb))), 13, 13, 19, 19)
+      $badgeFont = New-Object System.Drawing.Font("Segoe UI", 13, [System.Drawing.FontStyle]::Bold, [System.Drawing.GraphicsUnit]::Pixel)
+      $g.DrawString($label, $badgeFont, (New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(255, 15, 17, 21))),
+                    (New-Object System.Drawing.RectangleF(13, 13, 19, 19)), $center)
+    }
+    $g.Dispose()
+    $h = $bmp.GetHicon(); $tray.Icon = [System.Drawing.Icon]::FromHandle($h); $bmp.Dispose()
+    if ($script:trayHandle -ne [IntPtr]::Zero) { [U]::DestroyIcon($script:trayHandle) | Out-Null }
+    $script:trayHandle = $h; $script:trayKey = $key
+  }
+  $tray.Text = $(if ($tip.Length -gt 63) { $tip.Substring(0, 60) + "..." } else { $tip })   # Windows caps tray tips at 63 characters
+  $tray.Visible = $true
+}
+
 $win.Add_Closed({
+  $tray.Visible = $false; $tray.Dispose()
   $h = Popup-Handle
   if ($h -ne [IntPtr]::Zero) { [U]::PostMessage($h, 0x10, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null }   # close the pop-up too
 })
@@ -187,7 +239,9 @@ $focusTimer.Add_Tick({
   if ($h -eq [IntPtr]::Zero -or -not [U]::IsWindowVisible($h) -or [U]::IsIconic($h)) { $script:shown = $false; return }
   if (((Get-Date) - $script:shownAt).TotalMilliseconds -lt 800) { return }
   $fg = [U]::GetAncestor([U]::GetForegroundWindow(), 3)   # root owner, so the pop-up's own dialogs count as the pop-up
-  if ($fg -ne $h -and $fg -ne $script:self) { Hide-Popup }
+  # The taskbar and tray take focus while you click the tray icon, which toggles the pop-up itself.
+  $taskbar = @("Shell_TrayWnd", "Shell_SecondaryTrayWnd", "NotifyIconOverflowWindow", "TopLevelWindowForOverflowXamlIsland") -contains [U]::ClassOf($fg)
+  if ($fg -ne $h -and $fg -ne $script:self -and -not $taskbar) { Hide-Popup }
 })
 
 $script:wasWaiting = $false
@@ -200,15 +254,18 @@ function Update-Badge {
       $badge.Background = "#F5B942"; $count.Text = $waiting.Count; $badge.Visibility = "Visible"
       $win.ToolTip = "Waiting for you: " + ($waiting -join ", ")
       if (-not $script:wasWaiting) { $ring.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $pulse) }
+      Set-Tray "$($waiting.Count)" 0xFFF5B942 $win.ToolTip
     } else {
       if ($script:wasWaiting) { $ring.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $null); $ring.Opacity = 0 }
       $badge.Background = "#3ECF8E"; $count.Text = $s.running
       $badge.Visibility = $(if ($s.running) { "Visible" } else { "Collapsed" })
       $win.ToolTip = $(if ($s.running) { "$($s.running) running, $($s.busy) working" } else { "No chats running" })
+      Set-Tray $(if ($s.running) { "$($s.running)" } else { "" }) 0xFF3ECF8E "Claude chats: $($win.ToolTip)"
     }
     $script:wasWaiting = [bool]$waiting.Count
   } catch {
     $disc.Opacity = 0.45; $badge.Visibility = "Collapsed"; $win.ToolTip = "Dashboard server isn't running"
+    Set-Tray "" 0 "Claude chats: the dashboard server isn't running"
   }
 }
 $pollTimer = New-Object System.Windows.Threading.DispatcherTimer

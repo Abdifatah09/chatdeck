@@ -32,7 +32,9 @@ The server binds to 127.0.0.1 only, and every API call needs a token that change
 `desktop/windows/bubble.ps1` puts a small always-on-top button in the bottom-left corner of the
 screen. Click it and the dashboard pops up above it; click again, or anywhere else, and it tucks
 away. The badge counts running chats and turns amber, with a pulsing ring, when one is waiting
-for you. Drag it to move it; right-click for more. It needs the server running, and Chrome or Edge.
+for you. Drag it to move it; right-click to hide it or for more. The same badge sits in the
+notification area by the clock, where a click pops the dashboard up in the bottom-right corner.
+It needs the server running, and Chrome or Edge.
 
 ```powershell
 powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File bubble.ps1 -Port 47123

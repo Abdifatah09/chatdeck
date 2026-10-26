@@ -1,6 +1,6 @@
 """Opening the dashboard window, and the Windows side of things when running under WSL
 (the corner bubble, shortcuts in the Start menu and Startup folder)."""
-import os, shutil, subprocess, webbrowser
+import filecmp, os, shutil, subprocess, webbrowser
 
 from . import terminals
 
@@ -85,8 +85,9 @@ def shortcut(lnk, target_folder, args="", hotkey=""):
 def start_bubble(port):
     """Start the corner bubble (and tray icon). A second start just shows the running one."""
     folder = win_folders()["local"] + "\\chatdeck"
-    if not os.path.exists(os.path.join(to_wsl(folder), "bubble.ps1")):
+    src, dst = os.path.join(PKG, "windows", "bubble.ps1"), os.path.join(to_wsl(folder), "bubble.ps1")
+    if not os.path.exists(dst) or not filecmp.cmp(src, dst, shallow=False):   # also after chatdeck is updated
         os.makedirs(to_wsl(folder), exist_ok=True)
-        shutil.copy(os.path.join(PKG, "windows", "bubble.ps1"), to_wsl(folder))
+        shutil.copy(src, dst)
     _ps(f'Start-Process powershell.exe -WindowStyle Hidden -ArgumentList "-NoProfile","-WindowStyle","Hidden",'
         f'"-ExecutionPolicy","Bypass","-File","{folder}\\bubble.ps1","-Port","{port}"')

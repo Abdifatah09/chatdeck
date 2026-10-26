@@ -277,6 +277,18 @@ class RenameRunningTest(Tmp):
             running[SID]["status"] = "idle"
             self.assertTrue(server.compact(SID)["ok"]); self.assertEqual(typed, ["/compact"])
 
+    def test_auto_rename_types_bare_rename_only_when_idle(self):
+        from chatdeck import server
+        self.write(user("x"))
+        running, typed = {SID: {"name": "auto", "status": "busy", "kind": "interactive", "pid": 1}}, []
+        with unittest.mock.patch.object(server, "INDEX", transcripts.Index(self.dir)), unittest.mock.patch.object(server, "PROJECTS", self.dir), \
+             unittest.mock.patch.object(server, "agents", lambda fresh=False: running), \
+             unittest.mock.patch.object(server.terminals, "type_into", lambda pid, name, text: typed.append(text) or True):
+            self.assertFalse(server.auto_rename(SID)["ok"]); self.assertEqual(typed, [])
+            running[SID]["status"] = "idle"
+            self.assertTrue(server.auto_rename(SID)["ok"]); self.assertEqual(typed, ["/rename"])
+            self.assertIn("isn't running", server.auto_rename("00000000-0000-0000-0000-000000000000")["error"])
+
 
 class NewChatTest(Tmp):
     def test_opens_only_known_project_folders(self):
@@ -289,6 +301,18 @@ class NewChatTest(Tmp):
             self.assertTrue(server.new_chat(server.project(proj))["ok"])
             self.assertEqual(launched, [(proj, "claude")])
             self.assertEqual(server.new_chat("/etc")["error"], "unknown project")
+
+
+class WslLaunchTest(unittest.TestCase):
+    def test_new_window_by_default_tabs_when_asked(self):
+        from chatdeck import terminals
+        calls = []
+        with unittest.mock.patch.object(terminals, "_win_exe", lambda *a: "wt.exe"), \
+             unittest.mock.patch.object(terminals, "_spawn", lambda args, **kw: calls.append(args) or True):
+            terminals._wsl_launch("/w/proj", "claude")
+            with unittest.mock.patch.dict(os.environ, {"CHATDECK_TABS": "true"}):
+                terminals._wsl_launch("/w/proj", "claude")
+        self.assertEqual(calls[0][1:3], ["-w", "new"]); self.assertEqual(calls[1][1:4], ["-w", "0", "new-tab"])
 
 
 class CompactTest(Tmp):

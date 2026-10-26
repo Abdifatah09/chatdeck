@@ -4,13 +4,13 @@ A local dashboard for your Claude Code chats: see which chats are running and wh
 read and search old chats, track usage against your plan limits, and clean up transcripts.
 Python 3.9+ standard library only, no dependencies.
 
-![chatdeck showing three running chats, one waiting for permission, plan limits and a week of usage](docs/dashboard.png)
+![A tour of chatdeck: a chat waiting for permission, chats grouped by project, searching and reading an old chat, and the light theme](docs/media/tour.gif)
 
 ## Features
 
 - **Running now** – every live session with its context size and cost. Sessions stuck on a
   permission prompt or a question get an amber **Waiting for you** badge and an optional chime.
-  **Open** jumps to the chat's terminal tab, **Rename** runs `/rename` in it, and big chats get a
+  **Open** jumps to the chat's terminal tab, **Rename** runs `/rename` in it so Claude names it after what it's about (double-click the name to type your own), and big chats get a
   **Compact** button that runs `/compact`.
 - **Saved chats** – read any chat without resuming it, search across all messages,
   rename (so you know what's in it), export to Markdown, resume in a terminal, delete.
@@ -70,7 +70,19 @@ settings are backed up in `~/.chatdeck/backups`.
   `/rename` or `/compact` into that chat's terminal, only while it's idle.
 - `chatdeck setup` edits `~/.claude/settings.json` and backs it up first; `chatdeck uninstall` undoes it.
 
+## See it in action
+
+| Find any chat by what was said in it | Every project in one place |
+|---|---|
+| ![searching for "upgrade" and opening the matching chat](docs/media/search.gif) | ![switching to the by-project view, folding a project and the New chat button](docs/media/projects.gif) |
+
+| Keyboard only: `j`/`k`, `Enter`, `e` to rename, `?` for help | Running chats, at a glance |
+|---|---|
+| ![moving through saved chats, reading one and renaming it from the keyboard](docs/media/keyboard.gif) | ![three running chats: one waiting for permission, one working, one getting big](docs/media/running.png) |
+
 ## Screenshots
+
+![chatdeck showing three running chats, one waiting for permission, plan limits and a week of usage](docs/dashboard.png)
 
 | By project | Reading a chat |
 |---|---|
@@ -95,7 +107,7 @@ Start it with `chatdeck bubble`, or let `chatdeck autostart on` start it at logi
 
 | Platform | Opens chats in | Open on a running chat |
 |---|---|---|
-| WSL | Windows Terminal (new tab) | finds its tab on any virtual desktop and switches to it |
+| WSL | Windows Terminal (a new window each time) | finds its tab on any virtual desktop and switches to it |
 | macOS | Terminal, or iTerm2 if you run the dashboard from it | finds its tab by tty |
 | Linux | gnome-terminal, konsole, kitty, alacritty, wezterm, xfce4-terminal, tilix, foot or xterm | finds its window with `wmctrl` or `xdotool` (X11) |
 
@@ -109,6 +121,7 @@ Settings live in `~/.chatdeck/config.json`, and environment variables override t
 
 - `port` / `CHATDECK_PORT`: default 47123
 - `terminal` / `CHATDECK_TERMINAL`: which terminal to use, e.g. `kitty` or `iterm`
+- `tabs` / `CHATDECK_TABS` (WSL): `true` opens chats as tabs in your last Windows Terminal window instead of a new window each
 - `vdlib` / `CHATDECK_VDLIB` (WSL): Windows path to [VirtualDesktopLib.cs](https://github.com/MScholtes/VirtualDesktop),
   which makes switching to a chat on another virtual desktop reliable
 - `CHATDECK_DIR`: where chatdeck keeps its data, default `~/.chatdeck`
@@ -118,3 +131,16 @@ Settings live in `~/.chatdeck/config.json`, and environment variables override t
 ```sh
 python3 -m unittest discover -s tests
 ```
+
+## Screenshots and videos
+
+Everything in `docs/` is recorded from `chatdeck demo` by a script, so it can be redone after UI changes
+(needs Node; uses Segoe UI from `/mnt/c/Windows/Fonts` when run under WSL):
+
+```sh
+cd scripts/promo && npm install && npx playwright-core install chromium-headless-shell
+npm run record                    # or just some: npm run record -- shots tour search projects keyboard
+```
+
+It writes the README screenshots to `docs/` and the GIFs, MP4s, framed screenshots and a 1280×640
+social preview card to `docs/media/`.

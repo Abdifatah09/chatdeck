@@ -177,7 +177,7 @@ const running=()=>S.filter(x=>x.status).sort((a,b)=>!!b.waiting-!!a.waiting||(b.
 function groups(){const m=new Map(),get=k=>m.get(k)||(m.set(k,{key:k,run:[],saved:[],all:[],last:0}),m.get(k));
   for(const x of S){const g=get(pkey(x));g.last=Math.max(g.last,x.mtime);if(x.status)g.run.push(x);else g.all.push(x)}
   for(const x of savedFiltered())get(pkey(x)).saved.push(x);
-  for(const g of m.values())g.run.sort((a,b)=>(b.started||0)-(a.started||0));  // newest first, and it stays there
+  for(const g of m.values())g.run.sort((a,b)=>b.mtime-a.mtime);  // the chat you last talked to on top
   let G=[...m.values()];if(words().length)G=G.filter(g=>g.saved.length);
   for(const g of m.values())g.lastSaved=Math.max(0,...g.all.map(x=>x.mtime));
   return G.sort((a,b)=>!a.run.length-!b.run.length||(a.run.length?pname(a.key).localeCompare(pname(b.key)):b.lastSaved-a.lastSaved))}

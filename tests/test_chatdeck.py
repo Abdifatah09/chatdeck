@@ -64,6 +64,15 @@ class IndexTest(Tmp):
         self.assertEqual(e.days["2026-10-20"], [100, 7, 50, 3])
         self.assertEqual(e.ctx, 153)
 
+    def test_active_is_when_you_last_typed_not_when_the_file_changed(self):
+        self.write(user("hello") + assistant([{"type": "text", "text": "hi"}], ts="2026-10-20T10:05:00Z"))
+        e = self.idx.get(self.path); typed = e.active
+        self.assertEqual(typed, 1792490400.0)
+        self.write(line(type="system", subtype="away_summary", isMeta=True, timestamp="2026-10-20T10:08:00Z")
+                   + line(type="artifact-autoreact-ledger", sessionId=SID)
+                   + line(type="user", message={"content": [{"type": "tool_result", "content": "ok"}]}, timestamp="2026-10-20T10:09:00Z"))
+        self.assertEqual(self.idx.get(self.path).active, typed)
+
     def test_search_needs_every_word(self):
         self.write(user("deploy is slow") + assistant([{"type": "text", "text": "The Docker build cache was cold."}]))
         self.assertIn(SID, self.idx.search("docker cold"))
@@ -301,6 +310,46 @@ class NewChatTest(Tmp):
             self.assertTrue(server.new_chat(server.project(proj))["ok"])
             self.assertEqual(launched, [(proj, "claude")])
             self.assertEqual(server.new_chat("/etc")["error"], "unknown project")
+
+
+class ProjectsTest(Tmp):
+    def test_added_folder_is_listed_and_can_start_chats(self):
+        from chatdeck import server
+        proj = tempfile.mkdtemp(); launched = []
+        with unittest.mock.patch.object(server, "INDEX", self.idx), unittest.mock.patch.object(server, "agents", lambda fresh=False: {}), \
+             unittest.mock.patch.object(server.terminals, "launch", lambda cwd, cmd: launched.append((cwd, cmd)) or True):
+            self.assertIn("no folder", server.add_project("/no/such/dir")["error"])
+            r = server.add_project(proj); key = r["project"]
+            self.assertTrue(r["ok"]); self.assertIn(key, server.state()["projects"])
+            self.assertTrue(server.add_project(proj)["already"])
+            self.assertTrue(server.new_chat(key)["ok"]); self.assertEqual(launched, [(proj, "claude")])
+            self.assertTrue(server.delete_project(key)["ok"])
+            self.assertNotIn(key, server.state()["projects"]); self.assertTrue(os.path.isdir(proj))   # folder kept
+
+    def test_delete_removes_its_chats_but_not_while_one_runs(self):
+        from chatdeck import server
+        proj = tempfile.mkdtemp(); running = {SID: {"cwd": proj}}
+        self.write(line(type="user", message={"role": "user", "content": "hi"}, cwd=proj))
+        with unittest.mock.patch.object(server, "INDEX", self.idx), unittest.mock.patch.object(server, "PROJECTS", self.dir), \
+             unittest.mock.patch.object(server, "agents", lambda fresh=False: running):
+            key = server.project(proj)
+            self.assertIn("running", server.delete_project(key)["error"]); self.assertTrue(os.path.exists(self.path))
+            running.clear()
+            self.assertEqual(server.delete_project(key), {"ok": True, "deleted": 1})
+            self.assertFalse(os.path.exists(self.path)); self.assertTrue(os.path.isdir(proj))
+            self.assertEqual(server.delete_project(key)["error"], "unknown project")
+
+    def test_deleting_every_chat_leaves_the_project_listed_empty(self):
+        from chatdeck import server
+        proj = tempfile.mkdtemp()
+        self.write(line(type="user", message={"role": "user", "content": "hi"}, cwd=proj))
+        with unittest.mock.patch.object(server, "INDEX", self.idx), unittest.mock.patch.object(server, "PROJECTS", self.dir), \
+             unittest.mock.patch.object(server, "agents", lambda fresh=False: {}):
+            key = server.project(proj)
+            self.assertEqual(server.delete([SID])["deleted"], [SID])
+            self.assertIn(key, server.state()["projects"])
+            self.assertEqual(server.delete_project(key), {"ok": True, "deleted": 0})
+            self.assertNotIn(key, server.state()["projects"])
 
 
 class WslLaunchTest(unittest.TestCase):

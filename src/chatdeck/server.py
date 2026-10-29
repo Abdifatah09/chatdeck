@@ -1,7 +1,7 @@
 """chatdeck: a local dashboard for Claude Code chats.
 Lists running sessions (claude agents --json) and saved transcripts under
 ~/.claude/projects, and can view, search, rename, export and delete saved chats, stop
-sessions, and open chats in a terminal (see terminals.py). Binds 127.0.0.1 only; every API call needs
+sessions, add and delete projects, and open chats in a terminal (see terminals.py). Binds 127.0.0.1 only; every API call needs
 the per-run token embedded in the page (custom header => cross-site pages can't call it)."""
 import json, os, glob, secrets, shlex, signal, subprocess, threading, time
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
@@ -139,16 +139,16 @@ def state():
         a = act.get(sid, {})
         out.append({"sid": sid, "name": pend.get(sid) or a.get("name") or e.title or "(empty)",
                     "cwd": (a.get("cwd") or e.cwd or "").replace(HOME, "~"), "project": chat_project(e, a.get("cwd")),
-                    "ctx": e.ctx, "msgs": e.msgs, "mtime": e.mtime, "size": e.size, "cost": round(e.cost, 2),
+                    "ctx": e.ctx, "msgs": e.msgs, "mtime": e.mtime, "active": e.active or e.mtime, "size": e.size, "cost": round(e.cost, 2),
                     "status": a.get("status"), "kind": a.get("kind"), "started": a.get("startedAt"), "waiting": wait.get(sid)})
     for sid, a in act.items():  # running but no transcript yet
         if sid not in chats:
             out.append({"sid": sid, "name": pend.get(sid) or a.get("name") or "(new chat)", "cwd": (a.get("cwd") or "").replace(HOME, "~"),
                         "project": project(a.get("cwd")),
-                        "ctx": 0, "msgs": 0, "mtime": time.time(), "size": 0, "cost": 0, "status": a.get("status"),
+                        "ctx": 0, "msgs": 0, "mtime": time.time(), "active": time.time(), "size": 0, "cost": 0, "status": a.get("status"),
                         "kind": a.get("kind"), "started": a.get("startedAt"), "waiting": wait.get(sid)})
     out.sort(key=lambda x: -x["mtime"])
-    return {"chats": out, "now": time.time(), "usage": usage.summary([e for _, e in chats.values()], STATUS, LIMITS, project=chat_project)}
+    return {"chats": out, "projects": added_projects(), "now": time.time(), "usage": usage.summary([e for _, e in chats.values()], STATUS, LIMITS, project=chat_project)}
 
 def manual(cwd, command):
     """What to paste into a terminal when no terminal could be opened for the person."""
@@ -176,16 +176,20 @@ def transcript(sid):
     return hits[0]
 
 def delete(sids):
-    act = agents(fresh=True); done, refused = [], []
+    """Delete saved chats. Their projects stay listed, empty, until the project itself is deleted."""
+    act = agents(fresh=True); done, refused = [], []; kept = added_projects(); keep = False
     for sid in sids:
         p = transcript(sid)
         if not p or sid in act:
             refused.append(sid); continue
+        e = INDEX.get(p); proj = chat_project(e)
+        if proj and proj not in kept: kept[proj] = e.active or e.mtime; keep = True
         os.remove(p); INDEX.forget(p)
         side = p[:-6]  # sibling folder with this chat's tool output / subagents
         if os.path.isdir(side):
             subprocess.run(["rm", "-rf", "--", side])
         done.append(sid)
+    if keep: _set_added(kept)
     return {"deleted": done, "refused": refused}
 
 def _demo_rename(sid, title):
@@ -260,11 +264,46 @@ def open_chat(sid, view=False):
     if terminals.launch(cwd, inner): return {"ok": True}
     return {"ok": False, "copy": manual(cwd, inner)}
 
+# Projects added by hand ({project: when added}), so a folder shows up before it has any chats.
+def added_projects():
+    return config.load().get("projects") or {}
+
+def _set_added(projects):
+    cfg = config.load(); cfg["projects"] = projects; config.save(cfg)
+
+def known_projects():
+    return ({chat_project(e) for _, e in INDEX.all().values()} | {project(a.get("cwd")) for a in agents().values()}
+            | set(added_projects()))
+
+def add_project(path):
+    """List a folder as a project. A folder inside a git repo adds the repo, like its chats would."""
+    path = str(path or "").strip()
+    if not path: return {"ok": False, "error": "type the folder's path"}
+    full = os.path.abspath(os.path.expanduser(path))
+    if not os.path.isdir(full): return {"ok": False, "error": f"there's no folder at {path}"}
+    proj = project(full)
+    if proj in known_projects(): return {"ok": True, "project": proj, "already": True}
+    _set_added(dict(added_projects(), **{proj: time.time()}))
+    return {"ok": True, "project": proj}
+
+def delete_project(proj):
+    """Take a project off the list: delete its saved chats and forget it was added. Its folder is never touched.
+    Refused while any of its chats are running, so nothing is half-deleted."""
+    act = agents(fresh=True)
+    chats = INDEX.all()
+    if any((chat_project(chats[sid][1], a.get("cwd")) if sid in chats else project(a.get("cwd"))) == proj for sid, a in act.items()):
+        return {"ok": False, "error": "it has running chats - stop them first"}
+    sids = [sid for sid, (_, e) in chats.items() if chat_project(e) == proj]
+    added = added_projects()
+    if not sids and proj not in added: return {"ok": False, "error": "unknown project"}
+    r = delete(sids); added = added_projects()   # re-read: delete() keeps the emptied project listed
+    if proj in added: del added[proj]; _set_added(added)
+    return {"ok": True, "deleted": len(r["deleted"])}
+
 def new_chat(proj):
     """Start a new Claude Code chat in a project folder. Only folders chatdeck lists as projects are allowed."""
     if config.DEMO: return DEMO_OFF
-    known = {chat_project(e) for _, e in INDEX.all().values()} | {project(a.get("cwd")) for a in agents().values()}
-    if proj not in known: return {"ok": False, "error": "unknown project"}
+    if proj not in known_projects(): return {"ok": False, "error": "unknown project"}
     cwd = os.path.join(HOME, proj[2:]) if proj.startswith("~/") else HOME if proj == "~" else proj
     if not os.path.isdir(cwd): return {"ok": False, "error": f"{proj} doesn't exist any more"}
     if terminals.launch(cwd, "claude"): return {"ok": True}
@@ -328,6 +367,8 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/api/compact": return self.send(200, compact(body.get("sid", "")))
         if self.path == "/api/open": return self.send(200, open_chat(body.get("sid", ""), body.get("view", False)))
         if self.path == "/api/new": return self.send(200, new_chat(body.get("project", "")))
+        if self.path == "/api/project/add": return self.send(200, add_project(body.get("path", "")))
+        if self.path == "/api/project/delete": return self.send(200, delete_project(body.get("project", "")))
         if self.path == "/api/open-running": return self.send(200, open_running(body.get("sid", "")))
         self.send(404, {"error": "not found"})
 

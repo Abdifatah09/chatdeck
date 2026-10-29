@@ -2,7 +2,7 @@
 
 The index reads each file incrementally: it remembers how far it got and only parses
 lines appended since, so a 30 MB chat that grows by one message costs one message."""
-import json, os, re, threading
+import datetime, json, os, re, threading
 
 UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 TAG = re.compile(r"<(system-reminder|local-command-[a-z]+|command-[a-z]+)>.*?</\1>", re.S)
@@ -19,6 +19,11 @@ def _user_text(c):
     return None
 
 
+def _secs(ts):
+    try: return datetime.datetime.fromisoformat(ts.replace("Z", "+00:00")).timestamp()
+    except (AttributeError, ValueError): return None
+
+
 def _assistant_text(c):
     if not isinstance(c, list): return ""
     return "\n".join(b.get("text", "") for b in c if isinstance(b, dict) and b.get("type") == "text").strip()
@@ -26,13 +31,14 @@ def _assistant_text(c):
 
 class Entry:
     __slots__ = ("ino", "offset", "size", "mtime", "custom", "ai", "summary", "first", "cwd", "ctx", "msgs",
-                 "days", "seen", "cost", "text", "text_lc", "cwds")
+                 "days", "seen", "cost", "text", "text_lc", "cwds", "active")
 
     def __init__(self, ino):
         self.ino = ino; self.offset = 0; self.size = 0; self.mtime = 0.0
         self.custom = self.ai = self.summary = self.first = self.cwd = None
         self.ctx = self.msgs = 0; self.days = {}; self.seen = set(); self.cost = 0.0
         self.text = []; self.text_lc = ""; self.cwds = {}   # folder -> lines written there, to tell where the chat mostly worked
+        self.active = None   # when the person last typed a message. Not mtime: idle chats keep appending bookkeeping lines
 
     @property
     def title(self):
@@ -54,6 +60,7 @@ class Entry:
             txt = _user_text(m.get("content"))
             if txt:
                 self.msgs += 1; self.first = self.first or txt.replace("\n", " ")[:90]
+                self.active = _secs(d.get("timestamp")) or self.active
                 self._add_text(txt)
         elif t == "assistant":
             u = m.get("usage") or {}

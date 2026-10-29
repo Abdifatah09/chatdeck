@@ -28,19 +28,25 @@ INDEX = transcripts.Index(PROJECTS)
 LIMITS = usage.LimitHistory(os.path.join(DATA, "limits-history.jsonl"))
 
 _agents = (0.0, {})
+_agents_ok = True   # did the latest fetch work?
 _agents_lock = threading.Lock()
 def _fetch_agents():
-    global _agents
+    """Refresh the cache; True if that worked. A failed check (non-zero exit, timeout, no output) keeps the last good list."""
+    global _agents, _agents_ok
+    _agents_ok = False
     try:
         if config.DEMO:
             with open(os.path.join(DATA, "demo-agents.json")) as f: out = f.read()
         else:
-            out = subprocess.run(["claude", "agents", "--json"], capture_output=True, text=True, timeout=30).stdout
-        res = {s["sessionId"]: s for s in json.loads(out or "[]") if s.get("sessionId")}
+            r = subprocess.run(["claude", "agents", "--json"], capture_output=True, text=True, timeout=30)
+            if r.returncode != 0 or not r.stdout.strip(): return False
+            out = r.stdout
+        res = {s["sessionId"]: s for s in json.loads(out) if s.get("sessionId")}
         with _agents_lock: _agents = (time.time(), res)
+        _agents_ok = True
+        return True
     except Exception:
-        pass
-    return _agents[1]
+        return False
 
 def _agents_loop():
     while True:
@@ -49,7 +55,16 @@ def _agents_loop():
 def agents(fresh=False):
     """Running sessions. Normal reads use the list a background thread keeps fresh, so pages never wait;
     destructive actions (delete/stop) ask for a fresh copy first."""
-    return _fetch_agents() if fresh else _agents[1]
+    if fresh: _fetch_agents()
+    return _agents[1]
+
+def agents_checked():
+    """A fresh running-sessions list, or None if we couldn't get one. Destructive actions use this, so a
+    failed check can never look like 'nothing is running'."""
+    act = agents(fresh=True)
+    return act if _agents_ok else None
+
+NO_CHECK = "couldn't check which chats are running"
 
 def waiting(act, chats):
     """{sid: message} for running chats stuck on a permission prompt or question. A mark from the
@@ -177,7 +192,9 @@ def transcript(sid):
 
 def delete(sids):
     """Delete saved chats. Their projects stay listed, empty, until the project itself is deleted."""
-    act = agents(fresh=True); done, refused = [], []; kept = added_projects(); keep = False
+    act = agents_checked()
+    if act is None: return {"deleted": [], "refused": list(sids), "error": NO_CHECK}
+    done, refused = [], []; kept = added_projects(); keep = False
     for sid in sids:
         p = transcript(sid)
         if not p or sid in act:
@@ -243,7 +260,9 @@ def compact(sid):
 
 def stop(sid):
     if config.DEMO: return DEMO_OFF
-    a = agents(fresh=True).get(sid)
+    act = agents_checked()
+    if act is None: return {"ok": False, "error": NO_CHECK}
+    a = act.get(sid)
     if not a or not a.get("pid"): return {"ok": False, "error": "not running"}
     pid = int(a["pid"])
     cmd = subprocess.run(["ps", "-o", "command=", "-p", str(pid)], capture_output=True, text=True).stdout
@@ -289,7 +308,8 @@ def add_project(path):
 def delete_project(proj):
     """Take a project off the list: delete its saved chats and forget it was added. Its folder is never touched.
     Refused while any of its chats are running, so nothing is half-deleted."""
-    act = agents(fresh=True)
+    act = agents_checked()
+    if act is None: return {"ok": False, "error": NO_CHECK}
     chats = INDEX.all()
     if any((chat_project(chats[sid][1], a.get("cwd")) if sid in chats else project(a.get("cwd"))) == proj for sid, a in act.items()):
         return {"ok": False, "error": "it has running chats - stop them first"}

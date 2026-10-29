@@ -166,7 +166,7 @@ function renderUsage(U){if(!U)return;const t=U.today,w=U.week_tot,fresh=a=>a[0]+
   else lim=`<div class="meta" style="margin-bottom:8px;white-space:normal">Plan limits appear here once a Claude session updates its status line (needs the status-line hook – see README).</div>`;
   $("usage").innerHTML=`<div class="ugrid"><div class="tile"><div class="v">${k(fresh(t))}</div><div class="l">tokens today</div></div>
    <div class="tile"><div class="v">${k(fresh(w))}</div><div class="l">last 7 days</div></div>
-   <div class="tile"><div class="v">${U.cost_24h?("$"+U.cost_24h.toFixed(2)):"–"}</div><div class="l">API-equivalent cost (24h)</div></div></div>
+   <div class="tile"><div class="v">${U.cost_24h?("$"+U.cost_24h.toFixed(2)):"–"}</div><div class="l">total cost of chats active in 24h</div></div></div>
    ${lim}<div class="chart">${U.week.map((x,i)=>`<div class="${i===6?"today":""}" style="height:${Math.round(x[1]/max*100)}%" title="${k(x[1])} tokens"><span>${dn(x[0])}</span></div>`).join("")}</div>
    <div class="proj">Top this week: ${U.by_project.map(([p,n])=>`<b>${esc(p)}</b> ${k(n)}`).join(" · ")||"–"}</div>`}
 
@@ -255,7 +255,7 @@ function onSearch(){render();clearTimeout(searchT);const q=$("q").value.trim();i
 
 /* actions */
 async function del(sids){if(!sids.length)return false;if(!confirm(`Delete ${sids.length} saved chat${sids.length>1?"s":""} permanently?`))return false;
-  const r=await getJ("/api/delete",{sids});sids.forEach(s=>sel.delete(s));toast(`Deleted ${r.deleted.length}`+(r.refused.length?` · ${r.refused.length} skipped (running)`:""));refresh(true);return true}
+  const r=await getJ("/api/delete",{sids});if(r.error){toast("Couldn't delete: "+r.error,4000);return false}sids.forEach(s=>sel.delete(s));toast(`Deleted ${r.deleted.length}`+(r.refused.length?` · ${r.refused.length} skipped (running)`:""));refresh(true);return true}
 /* when no terminal could be opened, hand over the command to paste instead */
 async function opened(r,msg){if(r.ok)return toast(msg);if(r.copy){try{await navigator.clipboard.writeText(r.copy);toast("Couldn't open a terminal – command copied, paste it into one")}catch{prompt("Run this in a terminal:",r.copy)}}else toast("Couldn't open: "+(r.error||"unknown error"))}
 /* projects: add a folder by its path; delete takes the project off the list along with its saved chats */

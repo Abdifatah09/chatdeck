@@ -19,8 +19,11 @@ class LimitHistory:
         self.path = path; self.keep = keep; self.samples = []; self.lock = threading.Lock()
         try:
             with open(path) as f:
-                self.samples = [json.loads(l) for l in f if l.strip()]
-        except (FileNotFoundError, ValueError):
+                for l in f:
+                    try: s = json.loads(l)
+                    except ValueError: continue
+                    if isinstance(s, dict) and all(k in s for k in "wtpr"): self.samples.append(s)
+        except OSError:
             pass
 
     def add(self, at, data):
@@ -58,12 +61,13 @@ class LimitHistory:
             s = [x for x in self.samples if x["w"] == key]
         if not s: return None
         cur = s[-1]
+        if now >= cur["r"]: return {"eta": None, "rate": None}   # that window has already reset
         win = [x for x in s if x["r"] == cur["r"] and x["t"] >= cur["t"] - lookback]
         if len(win) < 2 or cur["t"] - win[0]["t"] < 900: return {"eta": None, "rate": None}
         rate = (cur["p"] - win[0]["p"]) / (cur["t"] - win[0]["t"])   # % per second
         if rate <= 0: return {"eta": None, "rate": 0}
         eta = cur["t"] + (100 - cur["p"]) / rate
-        return {"eta": eta if eta < cur["r"] else None, "rate": round(rate * 3600, 1)}
+        return {"eta": eta if now <= eta < cur["r"] else None, "rate": round(rate * 3600, 1)}
 
 
 def summary(entries, status_dir, history, today=None, project=None):
@@ -84,7 +88,7 @@ def summary(entries, status_dir, history, today=None, project=None):
         try:
             with open(f) as fh: d = json.load(fh)
             at = os.path.getmtime(f)
-            if at > now - 86400: cost += float((d.get("cost") or {}).get("total_cost_usd") or 0)
+            if at > now - 86400: cost += float((d.get("cost") or {}).get("total_cost_usd") or 0)   # lifetime cost; status files keep no history
             if d.get("rate_limits"):
                 limits = {"data": d["rate_limits"], "at": at}
                 history.add(at, d["rate_limits"])

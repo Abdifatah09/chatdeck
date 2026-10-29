@@ -46,7 +46,11 @@ mark{background:var(--mark);color:inherit;border-radius:2px;padding:0 1px}
 .phead{display:flex;align-items:baseline;gap:8px;padding:9px 11px;cursor:pointer;user-select:none}.phead:hover{background:var(--panel2)}
 .phead .pn{font-weight:650;font-size:14px;white-space:nowrap}.phead .pp{color:var(--dim);font-size:11.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .phead .pc{font-size:11.5px;color:var(--dim);white-space:nowrap}.phead .pc .r{color:var(--green);font-weight:600}.phead .pc .w{color:var(--amber);font-weight:600}
-.phead{flex-wrap:wrap}.phead .btn{align-self:center;margin-left:auto}
+.phead{flex-wrap:wrap}.phead .acts{align-self:center;margin-left:auto;display:flex;gap:6px}
+.addp{background:var(--panel);border:1px solid var(--line2);border-radius:10px;padding:10px 11px;margin-bottom:9px}.addp[hidden]{display:none}
+.addp .row input{flex:1;min-width:120px;background:var(--input);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:4px 8px;font-size:12px;font-family:inherit}
+.addp .meta{white-space:normal;margin-top:6px}.addp .err{color:var(--red)}
+.psec.dragging{opacity:.45}.psec.dropBefore{box-shadow:0 -3px 0 var(--green)}.psec.dropAfter{box-shadow:0 3px 0 var(--green)}
 .caret{display:inline-block;transition:transform .15s;color:var(--dim);width:10px}.psec.closed .caret{transform:rotate(-90deg)}
 .pbody{padding:2px 10px 6px;border-top:1px solid var(--line)}.psec.closed .pbody{display:none}.pbody .card{background:var(--panel2);margin-top:7px}.pbody .card.waiting{background:linear-gradient(var(--amberbg),var(--amberbg)),var(--panel2)}
 .pbody .saved:last-child{border-bottom:0}
@@ -91,11 +95,14 @@ details.r pre{background:var(--code);border-radius:6px;padding:6px 8px;overflow:
 <div class="stats"><span id="nWait"></span><b id="nRun">–</b> running · <b id="nSaved">–</b> saved (<b id="disk">–</b>) · open chats hold <b id="tok">–</b> tokens</div></header>
 <div id="off">Dashboard server not reachable – retrying…</div>
 <main><h2>Usage</h2><div id="usage"></div>
-<div class="chatsHead"><h2 style="margin:0;flex:1">Chats</h2><div class="seg" title="How to list chats"><button data-mode="list">Running &amp; saved</button><button data-mode="project">By project</button></div></div>
+<div class="chatsHead"><h2 style="margin:0;flex:1">Chats</h2><button class="btn" id="porderReset" title="Go back to the automatic order: projects with running chats first, then the most recently used">Reset order</button><button class="btn" id="addBtn" title="List a folder as a project, so you can start chats in it">+ Add project</button><div class="seg" title="How to list chats"><button data-mode="list">Running &amp; saved</button><button data-mode="project">By project</button></div></div>
 <div class="tool"><input type="search" id="q" placeholder="Search names and messages  ( / )"></div>
 <div class="tool"><select class="btn" id="sort" title="Sort saved chats"><option value="recent">Recent</option><option value="size">Largest</option><option value="cost">Most expensive</option><option value="msgs">Most messages</option></select>
  <span style="flex:1"></span><select class="btn danger" id="cleanup" title="Delete old or empty chats"></select>
  <button class="btn danger" id="delSel" style="display:none">Delete selected</button></div>
+<div class="addp" id="addProj" hidden><div class="row"><input id="apPath" placeholder="Folder path, e.g. ~/code/my-app" spellcheck="false" autocomplete="off">
+ <button class="btn" id="apOk">Add</button><button class="btn" id="apCancel">Cancel</button></div>
+ <div class="meta" id="apMsg">A folder inside a git repo adds the whole repo.</div></div>
 <div id="list"></div></main>
 <div id="viewer"><header><div class="top"><button class="btn" id="vBack" title="Back (Esc)">←</button><span id="vTitle"></span>
   <button class="btn" id="vRen" title="Give this chat a name you'll recognise (e)">Rename</button></div>
@@ -109,7 +116,7 @@ details.r pre{background:var(--code);border-radius:6px;padding:6px 8px;overflow:
 <div id="toast"></div>
 <script>
 const TOKEN="__TOKEN__";if(new URLSearchParams(location.search).has("popup"))document.title="chatdeck\u200b";  // reads "chatdeck"; the zero-width space lets the desktop bubble tell its pop-up from the full window
-const $=id=>document.getElementById(id);let S=[],sel=new Set(),now=Date.now()/1000,hits={},cur=null,V=null,first=true,waitSeen=new Set();
+const $=id=>document.getElementById(id);let S=[],P={},sel=new Set(),now=Date.now()/1000,hits={},cur=null,V=null,first=true,waitSeen=new Set();
 const store={get(k,d){try{return localStorage.getItem(k)??d}catch{return d}},set(k,v){try{localStorage.setItem(k,v)}catch{}}};
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const ago=t=>{const s=now-t;return s<60?"just now":s<3600?Math.round(s/60)+" min ago":s<86400?Math.round(s/3600)+" h ago":Math.round(s/86400)+" d ago"};
@@ -168,19 +175,23 @@ const mode=()=>store.get("mode","list")==="project"?"project":"list";
 const pkey=x=>x.project||x.cwd||"(no folder)";
 const pname=k=>k==="~"?"Home folder":k.split("/").filter(Boolean).pop()||k;
 let collapsed=new Set();try{collapsed=new Set(JSON.parse(store.get("collapsed","[]")))}catch{}
+let porder=[];try{porder=JSON.parse(store.get("porder","[]"))}catch{}  // project keys in the order you dragged them into
 function savedFiltered(){const ws=words();let L=S.filter(x=>!x.status);
   if(ws.length)L=L.filter(x=>hits[x.sid]!==undefined||ws.every(w=>(x.name+" "+x.cwd).toLowerCase().includes(w)));
-  const by={recent:x=>-x.mtime,size:x=>-x.size,cost:x=>-x.cost,msgs:x=>-x.msgs}[$("sort").value];return L.sort((a,b)=>by(a)-by(b))}
+  const by={recent:x=>-x.active,size:x=>-x.size,cost:x=>-x.cost,msgs:x=>-x.msgs}[$("sort").value];return L.sort((a,b)=>by(a)-by(b))}
 /* orders stay put between refreshes (start time, not last activity) so nothing jumps while you aim at it */
 const running=()=>S.filter(x=>x.status).sort((a,b)=>!!b.waiting-!!a.waiting||(b.started||0)-(a.started||0));
 /* one entry per project: its running chats, its saved chats (after search and sort), and totals */
 function groups(){const m=new Map(),get=k=>m.get(k)||(m.set(k,{key:k,run:[],saved:[],all:[],last:0}),m.get(k));
-  for(const x of S){const g=get(pkey(x));g.last=Math.max(g.last,x.mtime);if(x.status)g.run.push(x);else g.all.push(x)}
+  for(const [key,at] of Object.entries(P))get(key).added=at;  // added by hand: listed even with no chats
+  for(const x of S){const g=get(pkey(x));g.last=Math.max(g.last,x.active);if(x.status)g.run.push(x);else g.all.push(x)}
   for(const x of savedFiltered())get(pkey(x)).saved.push(x);
-  for(const g of m.values())g.run.sort((a,b)=>b.mtime-a.mtime);  // the chat you last talked to on top
+  for(const g of m.values())g.run.sort((a,b)=>b.active-a.active);  // the chat you last talked to on top
   let G=[...m.values()];if(words().length)G=G.filter(g=>g.saved.length);
-  for(const g of m.values())g.lastSaved=Math.max(0,...g.all.map(x=>x.mtime));
-  return G.sort((a,b)=>!a.run.length-!b.run.length||(a.run.length?pname(a.key).localeCompare(pname(b.key)):b.lastSaved-a.lastSaved))}
+  for(const g of m.values())g.lastSaved=Math.max(g.added||0,...g.all.map(x=>x.active));
+  G.sort((a,b)=>!a.run.length-!b.run.length||(a.run.length?pname(a.key).localeCompare(pname(b.key)):b.lastSaved-a.lastSaved));
+  if(porder.length){const at=k=>porder.indexOf(k);G=G.map((g,i)=>[g,i]).sort(([a,i],[b,j])=>(at(a.key)-at(b.key))||i-j).map(([g])=>g)}  // projects new since you arranged them go on top
+  return G}
 /* saved chats in the order they're on screen, for j/k */
 function visibleSaved(){return mode()==="list"?savedFiltered():groups().filter(g=>!collapsed.has(g.key)).flatMap(g=>g.saved)}
 const where=(x,inProject)=>inProject?(x.cwd&&x.cwd!==x.project?esc(x.cwd)+" · ":""):esc(x.cwd||"–")+" · ";
@@ -191,16 +202,17 @@ function runCard(x,inProject){return `<div class="card${x.waiting?" waiting":""}
    <div class="row" style="margin-top:3px"><span class="meta" style="flex:1;margin:0"><b class="${cls(x.ctx)}">${k(x.ctx)} tokens</b>${x.ctx>=400e3?' · <span class="bad">expensive – every message re-sends all of this</span>':x.ctx>=150e3?' · getting big':''}</span>
    ${x.ctx>=150e3?`<button class="btn ${x.ctx>=400e3?"danger":""}" data-compact="${x.sid}" title="Run /compact in the chat: Claude summarises the conversation so far, so each message costs less">Compact</button>`:""}</div></div>`}
 function savedRow(x,inProject){const snip=hits[x.sid];return `<div class="saved${cur===x.sid?" cur":""}" data-row="${x.sid}"><input type="checkbox" data-sel="${x.sid}" ${sel.has(x.sid)?"checked":""}>
-   <div class="txt" data-view="${x.sid}"><div class="name" title="${esc(x.name)}">${hl(x.name)}</div><div class="meta">${where(x,inProject)}${x.msgs} msgs · ${mb(x.size)}${x.cost?" · "+usd(x.cost):""} · ${ago(x.mtime)}</div>
+   <div class="txt" data-view="${x.sid}"><div class="name" title="${esc(x.name)}">${hl(x.name)}</div><div class="meta">${where(x,inProject)}${x.msgs} msgs · ${mb(x.size)}${x.cost?" · "+usd(x.cost):""} · ${ago(x.active)}</div>
    ${snip?`<div class="snip">${hl(snip)}</div>`:""}</div>
    <button class="btn" data-ren="${x.sid}" title="Give this chat a name you'll recognise (e)">Rename</button><button class="btn" data-open="${x.sid}">Resume</button><button class="btn danger" data-del="${x.sid}">Delete</button></div>`}
-function cleanupSets(){const s=S.filter(x=>!x.status),old=d=>s.filter(x=>now-x.mtime>d*86400);
+function cleanupSets(){const s=S.filter(x=>!x.status),old=d=>s.filter(x=>now-x.active>d*86400);
   return [["empty","Empty chats",s.filter(x=>!x.msgs)],["7","Older than 7 days",old(7)],["30","Older than 30 days",old(30)],["90","Older than 90 days",old(90)]]}
 function render(){
   const run=running(),all=S.filter(x=>!x.status),nw=run.filter(x=>x.waiting).length,M=mode();
   $("nWait").innerHTML=nw?`<span class="w">${nw} waiting for you</span> · `:"";
   $("nRun").textContent=run.length;$("nSaved").textContent=all.length;$("disk").textContent=mb(all.reduce((a,x)=>a+x.size,0));$("tok").textContent=k(run.reduce((a,x)=>a+x.ctx,0));
   document.querySelectorAll(".seg button").forEach(b=>b.classList.toggle("on",b.dataset.mode===M));
+  $("addBtn").style.display=M==="project"?"":"none";$("porderReset").style.display=M==="project"&&porder.length?"":"none";if(M!=="project")$("addProj").hidden=true;
   const cs=cleanupSets();$("cleanup").innerHTML=`<option value="">Clean up…</option>`+cs.map(([v,l,L])=>`<option value="${v}" ${L.length?"":"disabled"}>${l} (${L.length}${L.length?", "+mb(L.reduce((a,x)=>a+x.size,0)):""})</option>`).join("");
   for(const s of [...sel]) if(!all.some(x=>x.sid===s)) sel.delete(s);
   if(cur&&!visibleSaved().some(x=>x.sid===cur))cur=null;
@@ -211,10 +223,11 @@ function render(){
     html=`<div class="sub">Running now</div>`+(run.length?run.map(x=>runCard(x,false)).join(""):'<div class="empty">No Claude sessions running.</div>')
      +`<div class="sub">Saved</div>`+(saved.length?saved.map(x=>savedRow(x,false)).join(""):q?noMatch:'<div class="empty">No saved chats.</div>')}
   else{const G=groups();html=G.length?G.map(g=>{const w=g.run.filter(x=>x.waiting).length,closed=collapsed.has(g.key);
-      return `<div class="psec${closed?" closed":""}"><div class="phead" data-ptoggle="${esc(g.key)}" title="${closed?"Show":"Hide"} this project's chats">
+      const real=g.key.startsWith("/")||g.key.startsWith("~");
+      return `<div class="psec${closed?" closed":""}" data-pkey="${esc(g.key)}"><div class="phead" data-ptoggle="${esc(g.key)}" draggable="true" title="${closed?"Show":"Hide"} this project's chats · drag to move it">
        <span class="caret">▾</span><span class="pn">${esc(pname(g.key))}</span><span class="pp">${esc(g.key)}</span>
-       <span class="pc">${w?`<span class="w">${w} waiting</span> · `:""}${g.run.length?`<span class="r">${g.run.length} running</span> · `:""}${g.all.length} saved${g.all.length?" · "+mb(g.all.reduce((a,x)=>a+x.size,0)):""}</span>${g.key.startsWith("/")||g.key.startsWith("~")?`<button class="btn" data-newchat="${esc(g.key)}" title="Start a new Claude Code chat in ${esc(g.key)}">+ New chat</button>`:""}</div>
-       <div class="pbody">${g.run.map(x=>runCard(x,true)).join("")}${g.saved.map(x=>savedRow(x,true)).join("")}${!g.run.length&&!g.saved.length?'<div class="empty">No chats.</div>':""}</div></div>`}).join(""):noMatch}
+       <span class="pc">${w?`<span class="w">${w} waiting</span> · `:""}${g.run.length?`<span class="r">${g.run.length} running</span> · `:""}${g.all.length?`${g.all.length} saved · ${mb(g.all.reduce((a,x)=>a+x.size,0))}`:g.run.length?"0 saved":"no chats yet"}</span>${real?`<span class="acts"><button class="btn" data-newchat="${esc(g.key)}" title="Start a new Claude Code chat in ${esc(g.key)}">+ New chat</button><button class="btn danger" data-pdel="${esc(g.key)}" title="Take this project off the list and delete its saved chats. The folder itself isn't touched">Delete project</button></span>`:""}</div>
+       <div class="pbody">${g.run.map(x=>runCard(x,true)).join("")}${g.saved.map(x=>savedRow(x,true)).join("")}${!g.run.length&&!g.saved.length?`<div class="empty">${g.all.length?"No chats.":real?"No chats yet – start one with + New chat.":"No chats."}</div>`:""}</div></div>`}).join(""):noMatch}
   $("list").innerHTML=html;
 }
 let lastSig="",lastDraw=0,pressing=false,hovering=false,heldSince=0,held=null;
@@ -225,11 +238,11 @@ document.addEventListener("mouseover",e=>{hovering=!!e.target.closest(HOT);if(!h
 document.documentElement.addEventListener("mouseleave",()=>{hovering=false;flush()});
 /* a redraw that arrived while the mouse was on a control; drawn when it moves off, or after 8s at most */
 function flush(){if(held&&!pressing){const d=held;held=null;draw(d)}}
-function draw(d){S=d.chats;now=d.now;lastDraw=Date.now();render();renderUsage(d.usage)}
+function draw(d){S=d.chats;P=d.projects||{};now=d.now;lastDraw=Date.now();render();renderUsage(d.usage)}
 let inflight=false;
 async function refresh(force){if(inflight&&!force)return;inflight=true;try{const d=await getJ("/api/state");$("off").style.display="none";
   const ws=new Set(d.chats.filter(x=>x.waiting).map(x=>x.sid));if(!first&&[...ws].some(s=>!waitSeen.has(s)))beep();waitSeen=ws;first=false;
-  const sig=JSON.stringify([d.chats.map(x=>[x.sid,x.name,x.status,x.ctx,x.msgs,x.size,x.cost,x.waiting]),d.usage]);
+  const sig=JSON.stringify([d.chats.map(x=>[x.sid,x.name,x.status,x.ctx,x.msgs,x.size,x.cost,x.waiting,x.active]),d.projects,d.usage]);
   const stale=Date.now()-lastDraw>60000;  // refresh the "x min ago" labels once a minute
   if(force||sig!==lastSig||stale){lastSig=sig;
     if(!force&&(editing||(pressing||hovering)&&(!held||Date.now()-heldSince<8000))){if(!held)heldSince=Date.now();held=d}else{held=null;draw(d)}}
@@ -245,6 +258,22 @@ async function del(sids){if(!sids.length)return false;if(!confirm(`Delete ${sids
   const r=await getJ("/api/delete",{sids});sids.forEach(s=>sel.delete(s));toast(`Deleted ${r.deleted.length}`+(r.refused.length?` · ${r.refused.length} skipped (running)`:""));refresh(true);return true}
 /* when no terminal could be opened, hand over the command to paste instead */
 async function opened(r,msg){if(r.ok)return toast(msg);if(r.copy){try{await navigator.clipboard.writeText(r.copy);toast("Couldn't open a terminal – command copied, paste it into one")}catch{prompt("Run this in a terminal:",r.copy)}}else toast("Couldn't open: "+(r.error||"unknown error"))}
+/* projects: add a folder by its path; delete takes the project off the list along with its saved chats */
+function showAdd(on){$("addProj").hidden=!on;$("apMsg").className="meta";$("apMsg").textContent="A folder inside a git repo adds the whole repo.";
+  if(on){$("apPath").value="";$("apPath").focus()}}
+function showProject(key){collapsed.delete(key);store.set("collapsed",JSON.stringify([...collapsed]));render();
+  const el=[...document.querySelectorAll("[data-pkey]")].find(e=>e.dataset.pkey===key);if(el)el.scrollIntoView({block:"nearest"})}
+async function addProject(){const path=$("apPath").value.trim();if(!path)return $("apPath").focus();
+  const r=await getJ("/api/project/add",{path});
+  if(!r.ok){$("apMsg").className="meta err";$("apMsg").textContent="Couldn't add it: "+r.error;return $("apPath").focus()}
+  showAdd(false);toast(r.already?`${pname(r.project)} is already listed`:`Added ${pname(r.project)}`);
+  await refresh(true);showProject(r.project)}
+async function deleteProject(key){const g=groups().find(x=>x.key===key)||{run:[],all:[]},n=g.all.length,name=pname(key);
+  if(g.run.length)return toast(`${name} has ${g.run.length} running chat${g.run.length>1?"s":""} – stop ${g.run.length>1?"them":"it"} first`,4000);
+  if(!confirm(n?`Delete the project "${name}"?\n\nThis permanently deletes its ${n} saved chat${n>1?"s":""} (${mb(g.all.reduce((a,x)=>a+x.size,0))}).\n\nThe folder ${key} and your files in it are not touched.`
+    :`Remove "${name}" from the list?\n\nThe folder ${key} isn't touched.`))return;
+  const r=await getJ("/api/project/delete",{project:key});
+  toast(r.ok?(r.deleted?`Deleted ${name} and its ${r.deleted} chat${r.deleted>1?"s":""}`:`Removed ${name}`):"Couldn't delete: "+r.error,4000);refresh(true)}
 async function resume(sid){await opened(await getJ("/api/open",{sid}),"Opening in a new terminal tab…")}
 
 /* viewer */
@@ -290,6 +319,11 @@ document.addEventListener("click",async e=>{if(e.target.classList.contains("ren"
   else if(d.orun){toast("Finding its terminal…",15000);const r=await getJ("/api/open-running",{sid:d.orun});await opened(r,"Opened – "+r.how)}
   else if(d.mode){store.set("mode",d.mode);cur=null;render()}
   else if(d.newchat){toast("Opening a new chat…",15000);await opened(await getJ("/api/new",{project:d.newchat}),"New chat opened in "+pname(d.newchat))}
+  else if(d.pdel){await deleteProject(d.pdel)}
+  else if(t.id==="addBtn"){showAdd($("addProj").hidden)}
+  else if(t.id==="porderReset"){porder=[];store.set("porder","[]");render();toast("Projects back in the automatic order")}
+  else if(t.id==="apOk"){await addProject()}
+  else if(t.id==="apCancel"){showAdd(false)}
   else if(t.closest("[data-ptoggle]")){const g=t.closest("[data-ptoggle]").dataset.ptoggle;collapsed.has(g)?collapsed.delete(g):collapsed.add(g);store.set("collapsed",JSON.stringify([...collapsed]));render()}
   else if(d.open){await resume(d.open)}
   else if(d.del){await del([d.del])}
@@ -337,6 +371,19 @@ document.addEventListener("keydown",async e=>{const typing=/INPUT|SELECT|TEXTARE
   else return;
   render();const r=document.querySelector(`[data-row="${cur}"]`);if(r)r.scrollIntoView({block:"nearest"})}catch(err){toast("Something went wrong: "+err.message)}});
 $("q").addEventListener("input",onSearch);
+/* dragging a project's header moves the project; refreshes wait until it's dropped (see pressing) */
+let dragKey=null;const psecs=()=>[...document.querySelectorAll(".psec")],clearDrop=()=>psecs().forEach(e=>e.classList.remove("dropBefore","dropAfter"));
+const below=(el,e)=>{const r=el.getBoundingClientRect();return e.clientY>r.top+r.height/2};
+$("list").addEventListener("dragstart",e=>{const h=e.target.closest&&e.target.closest(".phead");if(!h)return;dragKey=h.dataset.ptoggle;pressing=true;
+  e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("text/plain",pname(dragKey));h.parentElement.classList.add("dragging")});
+$("list").addEventListener("dragover",e=>{const el=dragKey&&e.target.closest(".psec");if(!el)return;e.preventDefault();clearDrop();
+  if(el.dataset.pkey!==dragKey)el.classList.add(below(el,e)?"dropAfter":"dropBefore")});
+$("list").addEventListener("drop",e=>{const el=dragKey&&e.target.closest(".psec");if(!el)return;e.preventDefault();
+  const keys=groups().map(g=>g.key).filter(k=>k!==dragKey),i=keys.indexOf(el.dataset.pkey);
+  if(i>=0){keys.splice(below(el,e)?i+1:i,0,dragKey);porder=[...keys,...porder.filter(k=>!keys.includes(k))];store.set("porder",JSON.stringify(porder))}
+  dragKey=null;render()});
+$("list").addEventListener("dragend",()=>{dragKey=null;clearDrop();psecs().forEach(e=>e.classList.remove("dragging"));pressing=false;flush()});
+$("apPath").addEventListener("keydown",e=>{e.stopPropagation();if(e.key==="Enter")addProject().catch(err=>toast("Something went wrong: "+err.message));if(e.key==="Escape")showAdd(false)});
 $("sort").value=store.get("sort","recent");applyTheme();applySound();
 refresh(true);setInterval(refresh,4000);
 </script></body></html>

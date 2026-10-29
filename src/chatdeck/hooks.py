@@ -5,7 +5,7 @@
   their status line looks the same as before.
 - Notification (`chatdeck hook waiting`): marks a chat as waiting on a permission prompt or a
   question. The dashboard treats the mark as cleared once the transcript moves on."""
-import json, os, re, shutil, subprocess, sys, time
+import json, os, re, shlex, shutil, subprocess, sys, time
 
 from . import config
 
@@ -55,9 +55,9 @@ def command():
     """How settings.json should call chatdeck: the absolute path of the installed command,
     or this Python running the package from wherever it lives."""
     exe = shutil.which("chatdeck")
-    if exe: return exe
+    if exe: return shlex.quote(exe)
     src = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return f"PYTHONPATH={src} {sys.executable} -m chatdeck"
+    return f"PYTHONPATH={shlex.quote(src)} {shlex.quote(sys.executable)} -m chatdeck"
 
 
 def _ours(cmd):

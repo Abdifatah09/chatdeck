@@ -3,3 +3,5 @@ __pycache__/
 node_modules/
 # promo videos are big; they go on the GitHub release, not in the repo (scripts/promo makes them)
 docs/media/*.mp4
+# agent worktrees made by Claude Code
+.claude/worktrees/

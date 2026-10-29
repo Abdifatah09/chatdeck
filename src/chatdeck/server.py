@@ -3,7 +3,7 @@ Lists running sessions (claude agents --json) and saved transcripts under
 ~/.claude/projects, and can view, search, rename, export and delete saved chats, stop
 sessions, add and delete projects, and open chats in a terminal (see terminals.py). Binds 127.0.0.1 only; every API call needs
 the per-run token embedded in the page (custom header => cross-site pages can't call it)."""
-import json, os, glob, secrets, shlex, signal, subprocess, threading, time
+import json, os, glob, secrets, shlex, signal, subprocess, sys, threading, time
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs, quote
 
@@ -392,15 +392,35 @@ class H(BaseHTTPRequestHandler):
         if self.path == "/api/open-running": return self.send(200, open_running(body.get("sid", "")))
         self.send(404, {"error": "not found"})
 
+CODE = os.path.dirname(os.path.abspath(__file__))
+def _code_stamp():
+    """When chatdeck's Python files last changed. The page is read from disk on every request, so only these go stale."""
+    return max((os.path.getmtime(p) for p in glob.glob(os.path.join(CODE, "*.py"))), default=0)
+
+def _watch_code(httpd, restart):
+    """Stop the server once its code changes (a git pull or reinstall), so serve() can start the new code.
+    Waits until the files stop changing, so it never starts on a half-finished pull."""
+    start = seen = _code_stamp()
+    while True:
+        time.sleep(2); now = _code_stamp()
+        if now != start and now == seen: restart.set(); httpd.shutdown(); return
+        seen = now
+
 def serve(port):
-    """Run the dashboard until stopped. Raises OSError if the port is taken."""
+    """Run the dashboard until stopped. Raises OSError if the port is taken. Restarts itself when its code changes."""
     httpd = ThreadingHTTPServer(("127.0.0.1", port), H)
     os.makedirs(DATA, exist_ok=True)
     pidfile = os.path.join(DATA, "server.pid")
     with open(pidfile, "w") as f: f.write(str(os.getpid()))
     threading.Thread(target=_agents_loop, daemon=True).start()
+    restart = threading.Event()
+    threading.Thread(target=_watch_code, args=(httpd, restart), daemon=True).start()
     try:
         httpd.serve_forever()
     finally:
-        try: os.remove(pidfile)
-        except OSError: pass
+        httpd.server_close()
+        if not restart.is_set():
+            try: os.remove(pidfile)
+            except OSError: pass
+    # same pid, so server.pid and the desktop bubble stay valid; the open page reloads when its old token is refused
+    os.execv(sys.executable, [sys.executable, "-m", "chatdeck", "serve", "--port", str(port)])

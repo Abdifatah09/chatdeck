@@ -166,7 +166,7 @@ function renderUsage(U){if(!U)return;const t=U.today,w=U.week_tot,fresh=a=>a[0]+
   else lim=`<div class="meta" style="margin-bottom:8px;white-space:normal">Plan limits appear here once a Claude session updates its status line (needs the status-line hook – see README).</div>`;
   $("usage").innerHTML=`<div class="ugrid"><div class="tile"><div class="v">${k(fresh(t))}</div><div class="l">tokens today</div></div>
    <div class="tile"><div class="v">${k(fresh(w))}</div><div class="l">last 7 days</div></div>
-   <div class="tile"><div class="v">${U.cost_24h?("$"+U.cost_24h.toFixed(2)):"–"}</div><div class="l">API-equivalent cost (24h)</div></div></div>
+   <div class="tile"><div class="v">${U.cost_24h?("$"+U.cost_24h.toFixed(2)):"–"}</div><div class="l">Total cost of chats active in 24h</div></div></div>
    ${lim}<div class="chart">${U.week.map((x,i)=>`<div class="${i===6?"today":""}" style="height:${Math.round(x[1]/max*100)}%" title="${k(x[1])} tokens"><span>${dn(x[0])}</span></div>`).join("")}</div>
    <div class="proj">Top this week: ${U.by_project.map(([p,n])=>`<b>${esc(p)}</b> ${k(n)}`).join(" · ")||"–"}</div>`}
 

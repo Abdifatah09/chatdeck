@@ -121,11 +121,11 @@ class ForecastTest(unittest.TestCase):
         return h
 
     def test_eta_from_pace(self):
-        f = self.hist([(0, 10), (1800, 20)]).forecast("five_hour")   # 10% per 30 min
+        f = self.hist([(0, 10), (1800, 20)]).forecast("five_hour", T0 + 1800)   # 10% per 30 min
         self.assertEqual(f["rate"], 20.0); self.assertAlmostEqual(f["eta"], T0 + 1800 + 4 * 3600)
 
     def test_no_eta_when_reset_comes_first(self):
-        f = self.hist([(0, 10), (1800, 20)], reset=5000).forecast("five_hour")
+        f = self.hist([(0, 10), (1800, 20)], reset=5000).forecast("five_hour", T0 + 1800)
         self.assertIsNone(f["eta"]); self.assertGreater(f["rate"], 0)
 
     def test_needs_enough_history_and_ignores_old_window(self):
@@ -133,7 +133,7 @@ class ForecastTest(unittest.TestCase):
         h = self.hist([(0, 90)], reset=100)
         h.add(T0 + 1000, {"five_hour": {"used_percentage": 1, "resets_at": T0 + 20000}})
         h.add(T0 + 2000, {"five_hour": {"used_percentage": 1, "resets_at": T0 + 20000}})
-        self.assertEqual(h.forecast("five_hour")["rate"], 0)
+        self.assertEqual(h.forecast("five_hour", T0 + 2000)["rate"], 0)
 
     def test_history_survives_restart(self):
         h = self.hist([(0, 10), (1800, 20)])

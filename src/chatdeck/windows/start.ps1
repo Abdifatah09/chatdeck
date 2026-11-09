@@ -1,6 +1,6 @@
 # chatdeck launcher for Windows (written by `chatdeck autostart on`): starts the chatdeck server
 # in WSL if it isn't running, then the corner bubble and tray icon. With -Open it also opens the
-# full dashboard window, or brings it forward if it's already open.
+# full dashboard window, or brings it forward if it's already open, docked to the right edge of the screen.
 param([switch]$Open)
 $Port = __PORT__
 $Distro = "__DISTRO__"
@@ -32,4 +32,5 @@ if ($Open) {
          Where-Object { Test-Path $_ } | Select-Object -First 1
     if ($b) { Start-Process $b -ArgumentList "--app=$Url", "--window-size=520,900" } else { Start-Process $Url }
   }
+  & "$PSScriptRoot\dock.ps1"
 }

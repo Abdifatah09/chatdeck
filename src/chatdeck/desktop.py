@@ -1,11 +1,11 @@
 """Opening the dashboard window, and the Windows side of things when running under WSL
 (the corner bubble, shortcuts in the Start menu and Startup folder)."""
-import filecmp, os, shutil, subprocess, webbrowser
+import base64, filecmp, os, shutil, subprocess, webbrowser
 
 from . import terminals
 
 PKG = os.path.dirname(os.path.abspath(__file__))
-WIN_FILES = ("bubble.ps1", "start.ps1")
+WIN_FILES = ("bubble.ps1", "start.ps1", "dock.ps1")
 
 
 # --- opening the dashboard ------------------------------------------------------------------
@@ -34,6 +34,7 @@ def open_dashboard(url):
         try:
             subprocess.Popen([*b, f"--app={url}", "--window-size=520,900"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                              start_new_session=True, cwd="/mnt/c" if b[0].startswith("/mnt/") else None)
+            if terminals.kind() == "wsl": dock_right()
             return
         except OSError:
             pass
@@ -46,6 +47,18 @@ def _ps(script, timeout=30):
     ps = terminals._win_exe("powershell.exe", "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe")
     r = subprocess.run([ps, "-NoProfile", "-Command", script], capture_output=True, text=True, cwd="/mnt/c", timeout=timeout)
     return r.stdout.strip()
+
+
+def dock_right():
+    """Move the full dashboard window to the right edge of its screen, in the background (it waits for the window)."""
+    with open(os.path.join(PKG, "windows", "dock.ps1")) as f: script = f.read()
+    ps = terminals._win_exe("powershell.exe", "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe")
+    try:
+        subprocess.Popen([ps, "-NoProfile", "-ExecutionPolicy", "Bypass", "-EncodedCommand",
+                          base64.b64encode(script.encode("utf-16-le")).decode()],
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True, cwd="/mnt/c")
+    except OSError:
+        pass
 
 
 def win_folders():
@@ -65,6 +78,7 @@ def install_windows_files(port, distro, cmd):
     folder = win_folders()["local"] + "\\chatdeck"
     dest = to_wsl(folder); os.makedirs(dest, exist_ok=True)
     shutil.copy(os.path.join(PKG, "windows", "bubble.ps1"), dest)
+    shutil.copy(os.path.join(PKG, "windows", "dock.ps1"), dest)
     shutil.copy(os.path.join(PKG, "static", "logo.ico"), dest)
     with open(os.path.join(PKG, "windows", "start.ps1")) as f: start = f.read()
     start = (start.replace("__PORT__", str(port)).replace("__DISTRO__", distro).replace("__CMD__", cmd))

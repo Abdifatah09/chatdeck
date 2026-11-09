@@ -25,6 +25,7 @@ Python 3.9+ standard library only, no dependencies.
   (**Reset order** goes back to the automatic order). Sort by recent, size, cost or messages. Light and dark themes.
   Keyboard shortcuts: `/` search, `j`/`k` move, `Enter` read, `r` resume, `e` rename, `x` select, `Del` delete, `?` help.
 - **Windows corner button and tray icon** – pop the dashboard up from the corner of the screen.
+  On Windows the full dashboard window opens docked to the right edge of the screen, full height.
 
 ## Install
 

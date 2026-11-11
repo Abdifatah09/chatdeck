@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>chatdeck, a local dashboard for your Claude Code chats</title>
+<meta name="description" content="chatdeck is a free, open source dashboard for Claude Code. See which chats are running and which are waiting for you, search and read old chats, and track your plan limits. Runs on your own machine; nothing is sent anywhere.">
+<link rel="canonical" href="https://abdifatah09.github.io/chatdeck/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="chatdeck, a local dashboard for your Claude Code chats">
+<meta property="og:description" content="See which Claude Code chats are running and which need you, search old chats, and track plan limits. Free, open source, local only.">
+<meta property="og:url" content="https://abdifatah09.github.io/chatdeck/">
+<meta property="og:image" content="https://abdifatah09.github.io/chatdeck/media/social-card.png">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "chatdeck",
+  "description": "A free, local dashboard for Claude Code chats: see which chats are running and which are waiting for you, read and search old chats, track usage against plan limits, and clean up transcripts.",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": "Windows (WSL), macOS, Linux",
+  "softwareRequirements": "Python 3.9 or newer",
+  "license": "https://opensource.org/licenses/MIT",
+  "url": "https://abdifatah09.github.io/chatdeck/",
+  "downloadUrl": "https://pypi.org/project/chatdeck/",
+  "codeRepository": "https://github.com/Abdifatah09/chatdeck",
+  "image": "https://abdifatah09.github.io/chatdeck/dashboard.png",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600&family=IBM+Plex+Sans:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="site.css">
+<script>document.documentElement.classList.add('js');</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="mast">
+  <div class="container mast__in">
+    <a class="mast__mark" href="./" aria-label="chatdeck home">chatdeck</a>
+    <nav aria-label="Elsewhere" class="mast__links">
+      <a href="https://github.com/Abdifatah09/chatdeck">GitHub</a>
+      <a href="https://pypi.org/project/chatdeck/">PyPI</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero" aria-labelledby="hero-title">
+    <canvas class="field" aria-hidden="true"></canvas>
+    <div class="container hero__in">
+      <div class="hero__text">
+        <h1 id="hero-title">Know which Claude chat needs you</h1>
+        <p class="lead">A free dashboard for every Claude Code chat, on your machine.</p>
+        <div class="hero__actions">
+          <div class="cmd cut">
+            <code id="install-cmd">pipx install chatdeck</code>
+            <button class="key key--sm" type="button" data-copy="install-cmd">Copy</button>
+          </div>
+          <a class="key key--primary" href="https://github.com/Abdifatah09/chatdeck">Get it on GitHub</a>
+        </div>
+        <p class="hero__note">Python 3.9 or newer. No accounts, no dependencies. <span class="copied" role="status" aria-live="polite"></span></p>
+      </div>
+
+      <figure class="sim" data-sim data-loop>
+        <figcaption class="visually-hidden">Four Claude Code chats run in four terminals. One stops to ask permission to run a command; chatdeck marks it as waiting for you, and Open jumps to it.</figcaption>
+        <div class="sim__panes" aria-hidden="true" data-slot="sim" data-kind="product">
+          <div class="pane is-waiting" data-pane="api">
+            <p class="pane__head">~/code/api-server</p>
+            <pre class="pane__body"><span class="l-you">&gt; Add rate limiting to the login route</span>
+<span class="l-tool">Read src/routes/auth.ts</span>
+<span class="l-tool">Write src/middleware/rateLimit.ts (+41)</span>
+<span class="l-ask">Bash wants to run: npm test</span>
+<span class="l-ask">Allow? (y/n)</span></pre>
+          </div>
+          <div class="pane" data-pane="shop">
+            <p class="pane__head">~/code/webshop</p>
+            <pre class="pane__body"><span class="l-you">&gt; Add Stripe checkout to the cart page</span>
+<span class="l-tool">Read src/pages/cart.tsx</span>
+<span class="l-tool">Edit src/api/checkout.ts (+38 -2)</span>
+<span class="l-out">Adding the Pay button…</span></pre>
+          </div>
+          <div class="pane" data-pane="app">
+            <p class="pane__head">~/code/mobile-app</p>
+            <pre class="pane__body"><span class="l-you">&gt; Fix push notifications on Android 14</span>
+<span class="l-tool">Read 14 files</span>
+<span class="l-out">Thinking…</span></pre>
+          </div>
+          <div class="pane" data-pane="blog">
+            <p class="pane__head">~/code/blog</p>
+            <pre class="pane__body"><span class="l-you">&gt; Draft a post about the 0.2.1 release</span>
+<span class="l-tool">Write posts/0-2-1.md</span>
+<span class="l-done">Done. The draft is in posts/0-2-1.md</span></pre>
+          </div>
+        </div>
+        <div class="deck cut">
+          <p class="deck__head"><b>chatdeck</b> <span data-sum>1 waiting for you, 3 running</span></p>
+          <ul class="deck__rows">
+            <li class="row is-waiting" data-row="api"><span class="row__name">api-rate-limit</span><span class="row__status">Waiting for you</span><span class="row__bar"><i style="--w: 0.24"></i></span><span class="row__tok">96k</span><button class="key key--row" type="button" data-open="api">Open</button></li>
+            <li class="row" data-row="shop"><span class="row__name">stripe-checkout</span><span class="row__status">Working</span><span class="row__bar"><i style="--w: 0.36"></i></span><span class="row__tok">142k</span><button class="key key--row" type="button" data-open="shop">Open</button></li>
+            <li class="row is-big" data-row="app"><span class="row__name">android-push</span><span class="row__status">Getting big</span><span class="row__bar"><i style="--w: 0.47"></i></span><span class="row__tok">188k</span><button class="key key--row" type="button" data-open="app">Open</button></li>
+            <li class="row is-idle" data-row="blog"><span class="row__name">release-post</span><span class="row__status">Idle</span><span class="row__bar"><i style="--w: 0.08"></i></span><span class="row__tok">31k</span><button class="key key--row" type="button" data-open="blog">Open</button></li>
+          </ul>
+        </div>
+        <button class="sim__pause" type="button" data-loop-toggle>Pause</button>
+      </figure>
+    </div>
+  </section>
+
+  <section class="screen" aria-label="The dashboard">
+    <div class="container">
+      <figure class="shot live">
+        <iframe src="demo/index.html" title="The real chatdeck dashboard, running on made-up chats" loading="eager"></iframe>
+      </figure>
+      <div class="live__bar">
+        <p>The real dashboard on made-up chats. Click around.</p>
+        <a href="demo/index.html">Open it full screen</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="moments" aria-labelledby="moments-title">
+    <div class="container">
+      <h2 id="moments-title">What your terminal tabs hide</h2>
+      <div class="tabs" data-tabs>
+        <div class="tabs__bar" role="tablist" aria-label="Features">
+          <button role="tab" id="t-wait" aria-controls="p-wait" aria-selected="true">A chat waiting on you</button>
+          <button role="tab" id="t-search" aria-controls="p-search" aria-selected="false" tabindex="-1">Search every message</button>
+          <button role="tab" id="t-proj" aria-controls="p-proj" aria-selected="false" tabindex="-1">Every project together</button>
+          <button role="tab" id="t-lim" aria-controls="p-lim" aria-selected="false" tabindex="-1">Plan limits</button>
+        </div>
+        <section class="tab" role="tabpanel" id="p-wait" aria-labelledby="t-wait">
+          <p class="tab__line">A chat stuck on a permission prompt turns amber, with an optional chime. <b>Open</b> jumps to its terminal tab.</p>
+          <figure class="shot"><img src="media/running.png" width="2560" height="714" alt="Three running chats: api-rate-limit waiting for you, stripe-checkout working, android-push idle and getting big"></figure>
+        </section>
+        <section class="tab" role="tabpanel" id="p-search" aria-labelledby="t-search">
+          <p class="tab__line">Find any chat by what was said in it, and read it without resuming it.</p>
+          <figure class="shot"><img src="media/search.png" width="2560" height="1720" loading="lazy" alt="Searching saved chats, with matching words highlighted"></figure>
+        </section>
+        <section class="tab" role="tabpanel" id="p-proj" aria-labelledby="t-proj">
+          <p class="tab__line">One section per repo, its running and saved chats together, and a <b>New chat</b> button.</p>
+          <figure class="shot"><img src="by-project.png" width="2560" height="1720" loading="lazy" alt="Chats grouped by project"></figure>
+        </section>
+        <section class="tab" role="tabpanel" id="p-lim" aria-labelledby="t-lim">
+          <p class="tab__line">Your 5-hour and weekly limits, and when you would hit them at the current pace.</p>
+          <figure class="shot"><img src="media/usage.png" width="2504" height="550" loading="lazy" alt="Usage: tokens today and this week, and the 5-hour and weekly limit bars"></figure>
+        </section>
+      </div>
+    </div>
+  </section>
+
+  <section class="pace" aria-labelledby="pace-title">
+    <div class="container pace__in">
+      <div class="pace__controls">
+        <h2 id="pace-title">When will you hit your limit?</h2>
+        <p class="lead">chatdeck works it out from your pace. Try it.</p>
+        <form class="pace__form" data-pace>
+          <label for="pace-used">Used of your 5-hour limit <output for="pace-used" data-out="used">62%</output></label>
+          <input id="pace-used" type="range" min="0" max="95" step="1" value="62">
+          <label for="pace-reset">Resets in <output for="pace-reset" data-out="reset">2h 16m</output></label>
+          <input id="pace-reset" type="range" min="10" max="300" step="2" value="136">
+          <fieldset class="seg"><legend>Your pace</legend>
+            <input type="radio" name="pace" id="pace-1" value="10"><label for="pace-1">Steady</label>
+            <input type="radio" name="pace" id="pace-2" value="22" checked><label for="pace-2">Busy</label>
+            <input type="radio" name="pace" id="pace-3" value="45"><label for="pace-3">Three chats at once</label>
+          </fieldset>
+        </form>
+      </div>
+      <div class="pace__result graphite cut" aria-live="polite">
+        <p class="pace__label" data-verdict-label>At this pace you hit the limit in</p>
+        <p class="pace__figure" data-figure>1h 44m</p>
+        <p class="pace__meter" aria-hidden="true" data-meter></p>
+        <p class="pace__verdict" data-verdict>That is 32 min before it resets. Pace yourself, or switch chats to a cheaper model.</p>
+        <p class="pace__legend"><span class="k-used">used</span> <span class="k-proj">at this pace, until the reset</span> <span class="k-over">past the limit</span></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="map" aria-labelledby="map-title">
+    <div class="container">
+      <div class="map__head">
+        <h2 id="map-title">Your chats never leave your machine</h2>
+        <p class="lead">chatdeck reads the files Claude Code already writes, and talks only to itself.</p>
+      </div>
+      <div class="map__wrap">
+        <svg class="map__svg" viewBox="0 0 1200 470" role="img" aria-labelledby="map-desc">
+          <desc id="map-desc">Claude Code writes transcripts to your home folder; chatdeck reads them, serves them on 127.0.0.1 to your browser, and sends nothing to the internet.</desc>
+          <rect class="m-edge" x="8" y="8" width="1184" height="372" rx="16"/>
+          <text class="m-zone" x="32" y="44">Your computer</text>
+
+          <path class="m-line" d="M250 200 H340"/>
+          <path class="m-line" d="M560 200 H650"/>
+          <path class="m-line m-line--accent" d="M870 200 H960"/>
+          <path class="m-line m-line--dash" d="M140 150 V100 H760 V150"/>
+          <text class="m-tag" x="450" y="90">hooks from chatdeck setup: plan limits, waiting for you</text>
+          <text class="m-tag" x="262" y="188">writes</text>
+          <text class="m-tag" x="574" y="188">reads</text>
+          <text class="m-tag" x="878" y="188">token</text>
+
+          <rect class="m-node" x="30" y="150" width="220" height="100" rx="8"/>
+          <text class="m-name" x="50" y="192">Claude Code</text>
+          <text class="m-sub" x="50" y="220">your chats, in terminals</text>
+
+          <rect class="m-node" x="340" y="150" width="220" height="100" rx="8"/>
+          <text class="m-code" x="360" y="192">~/.claude/projects</text>
+          <text class="m-sub" x="360" y="220">the transcripts</text>
+
+          <rect class="m-node m-node--accent" x="650" y="150" width="220" height="100" rx="8"/>
+          <text class="m-name m-name--accent" x="670" y="192">chatdeck</text>
+          <text class="m-code m-code--sm" x="670" y="220">127.0.0.1 only</text>
+
+          <rect class="m-node" x="960" y="150" width="210" height="100" rx="8"/>
+          <text class="m-name" x="980" y="192">Your browser</text>
+          <text class="m-sub" x="980" y="220">the dashboard</text>
+
+          <path class="m-line m-line--dash" d="M760 250 V340"/>
+          <path class="m-cut" d="M744 332 L776 348 M744 348 L776 332"/>
+          <text class="m-tag" x="790" y="345">nothing sent</text>
+          <text class="m-zone m-zone--out" x="32" y="440">The internet: no accounts, no telemetry, no network calls</text>
+        </svg>
+      </div>
+      <ol class="map__legend">
+        <li><b>Claude Code</b> writes each chat to <code>~/.claude/projects</code>.</li>
+        <li><b>chatdeck</b> reads them and serves the dashboard on 127.0.0.1 only.</li>
+        <li><b>It changes only what you ask</b>, and backs up your settings first.</li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="where" aria-labelledby="where-title">
+    <div class="container where__in">
+      <h2 id="where-title">Runs where Claude Code runs</h2>
+      <table class="where__table">
+        <thead><tr><th scope="col">System</th><th scope="col">Opens chats in</th><th scope="col">Extras</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Windows, through WSL</th><td>Windows Terminal</td><td>A corner button and tray icon</td></tr>
+          <tr><th scope="row">macOS</th><td>Terminal or iTerm2</td><td>Starts at login</td></tr>
+          <tr><th scope="row">Linux</th><td>gnome-terminal, konsole, kitty and six more</td><td>Starts at login</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="close" id="try" aria-labelledby="try-title">
+    <div class="container close__in">
+      <div class="close__text">
+        <h2 id="try-title">Try it on made-up chats first</h2>
+        <pre class="term cut"><code><span class="term__line">pipx install chatdeck</span>
+<span class="term__line">chatdeck demo    <span class="term__note"># sample chats, yours untouched</span></span>
+<span class="term__line">chatdeck setup   <span class="term__note"># limits and waiting alerts</span></span>
+<span class="term__line">chatdeck</span></code></pre>
+        <a class="key" href="https://github.com/Abdifatah09/chatdeck#readme">Read the full guide</a>
+      </div>
+      <figure class="shot shot--close" data-slot="light" data-kind="product">
+        <img src="light.png" width="2560" height="1720" loading="lazy" alt="chatdeck in the light theme, showing running and saved chats">
+      </figure>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="container">
+    <p class="foot__line">Free, MIT licensed, and nothing leaves your machine.</p>
+    <ul class="foot__links">
+      <li><a href="https://github.com/Abdifatah09/chatdeck">Source on GitHub</a></li>
+      <li><a href="https://pypi.org/project/chatdeck/">chatdeck on PyPI</a></li>
+      <li><a href="https://github.com/Abdifatah09/chatdeck/issues">Report a problem</a></li>
+    </ul>
+    <p class="foot__legal">chatdeck is an independent project, not made by Anthropic.</p>
+  </div>
+</footer>
+
+<script src="site.js" defer></script>
+</body>
+</html>

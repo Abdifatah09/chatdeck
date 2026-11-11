@@ -5,3 +5,5 @@ node_modules/
 docs/media/*.mp4
 # agent worktrees made by Claude Code
 .claude/worktrees/
+# Hallmark design-run log and screenshots
+.hallmark/

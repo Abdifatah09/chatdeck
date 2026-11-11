@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://abdifatah09.github.io/chatdeck/sitemap.xml

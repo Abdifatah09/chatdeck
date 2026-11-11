@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- chatdeck: a deck of chats - two cards behind a speech bubble -->
+  <defs>
+    <linearGradient id="front" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4C86F0"/><stop offset="1" stop-color="#2A5BD7"/>
+    </linearGradient>
+  </defs>
+  <rect x="23" y="5" width="36" height="28" rx="7" fill="#A9C4F7"/>
+  <rect x="14" y="12" width="38" height="29" rx="7" fill="#6E9BEE"/>
+  <path d="M13 20h34a8 8 0 0 1 8 8v16a8 8 0 0 1-8 8H24l-11 9 2-9h-2a8 8 0 0 1-8-8V28a8 8 0 0 1 8-8z" fill="url(#front)"/>
+  <rect x="14" y="30" width="26" height="4.5" rx="2.25" fill="#fff"/>
+  <rect x="14" y="38.5" width="17" height="4.5" rx="2.25" fill="#fff" opacity=".8"/>
+</svg>

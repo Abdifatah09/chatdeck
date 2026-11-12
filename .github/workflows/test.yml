@@ -14,8 +14,8 @@ jobs:
         python: ["3.9", "3.13"]
     # The name stays "test (ubuntu-latest, 3.9)" etc. because branch protection requires those checks by name.
     name: test (${{ matrix.os }}, ${{ matrix.python }})
-    # ubuntu-latest is Ubuntu 26.04, which has no Python 3.9 build, so 3.9 runs on 24.04.
-    runs-on: ${{ (matrix.os == 'ubuntu-latest' && matrix.python == '3.9') && 'ubuntu-24.04' || matrix.os }}
+    # ubuntu-latest is Ubuntu 26.04: it has no Python 3.9 build and its queue is very slow, so Ubuntu jobs run on 24.04.
+    runs-on: ${{ matrix.os == 'ubuntu-latest' && 'ubuntu-24.04' || matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
